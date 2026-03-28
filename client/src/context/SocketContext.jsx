@@ -6,7 +6,10 @@ const SocketContext = createContext(null);
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
 
 // Single socket instance shared across the app
-const socket = io(SOCKET_URL, { autoConnect: true });
+const socket = io(SOCKET_URL, {
+  autoConnect: true,
+  transports: ['websocket'],
+});
 
 export function SocketProvider({ children }) {
   return (

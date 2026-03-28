@@ -1,7 +1,7 @@
 import { useRef, useEffect } from 'react';
 import SudokuCell from './SudokuCell';
 
-export default function SudokuBoard({ board, puzzle, solution, onCellChange, disabled, selectedCell, onSelectCell }) {
+export default function SudokuBoard({ board, puzzle, onCellChange, disabled, selectedCell, onSelectCell }) {
   const cellRefs = useRef([]);
 
   useEffect(() => {
@@ -41,7 +41,6 @@ export default function SudokuBoard({ board, puzzle, solution, onCellChange, dis
           index={i}
           board={board}
           puzzle={puzzle}
-          solution={solution}
           onChange={handleChange}
           selected={selectedCell === i}
           onSelect={handleSelect}

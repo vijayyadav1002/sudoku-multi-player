@@ -27,9 +27,17 @@ export default function Home() {
 
   function handleCreate() {
     if (!nickname.trim()) return setError('Enter a nickname first');
+    if (!socket.connected) return setError('Not connected to server. Please refresh the page.');
     setLoading(true);
     setError('');
+
+    const timeout = setTimeout(() => {
+      setLoading(false);
+      setError('Server not responding. Please try again.');
+    }, 10_000);
+
     socket.emit('create-room', { nickname: nickname.trim(), difficulty }, (res) => {
+      clearTimeout(timeout);
       setLoading(false);
       if (!res.ok) return setError(res.error || 'Failed to create room');
       navigate(`/room/${res.roomId}`, {
@@ -46,9 +54,17 @@ export default function Home() {
   function handleJoin() {
     if (!nickname.trim()) return setError('Enter a nickname first');
     if (!roomCode.trim()) return setError('Enter a room code');
+    if (!socket.connected) return setError('Not connected to server. Please refresh the page.');
     setLoading(true);
     setError('');
+
+    const timeout = setTimeout(() => {
+      setLoading(false);
+      setError('Server not responding. Please try again.');
+    }, 10_000);
+
     socket.emit('join-room', { roomId: roomCode.trim().toUpperCase(), nickname: nickname.trim() }, (res) => {
+      clearTimeout(timeout);
       setLoading(false);
       if (!res.ok) return setError(res.error || 'Failed to join room');
       navigate(`/game/${res.roomId}`, {

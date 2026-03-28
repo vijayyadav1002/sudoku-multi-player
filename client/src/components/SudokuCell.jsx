@@ -1,8 +1,8 @@
 import { forwardRef } from 'react';
-import { isCellGiven, isCellCorrect, isCellWrong } from '../lib/sudokuHelpers';
+import { isCellGiven } from '../lib/sudokuHelpers';
 
 const SudokuCell = forwardRef(function SudokuCell(
-  { index, board, puzzle, solution, onChange, selected, onSelect },
+  { index, board, puzzle, onChange, selected, onSelect },
   ref
 ) {
   const row = Math.floor(index / 9);
@@ -10,8 +10,6 @@ const SudokuCell = forwardRef(function SudokuCell(
 
   const given = isCellGiven(puzzle, index);
   const value = board[index];
-  const correct = !given && isCellCorrect(board, solution, index);
-  const wrong = !given && isCellWrong(board, solution, index);
 
   const borderRight = col === 2 || col === 5
     ? '2px solid #475569'
@@ -23,10 +21,8 @@ const SudokuCell = forwardRef(function SudokuCell(
   let bgColor = '#1e293b';
   if (given) bgColor = '#0f172a';
   if (selected && !given) bgColor = '#312e81';
-  if (correct) bgColor = '#14532d';
-  if (wrong) bgColor = '#450a0a';
 
-  const textColor = given ? '#f1f5f9' : correct ? '#4ade80' : wrong ? '#f87171' : '#cbd5e1';
+  const textColor = given ? '#f1f5f9' : '#cbd5e1';
 
   function handleKeyDown(e) {
     if (given) return;
