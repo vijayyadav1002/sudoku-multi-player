@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="80" fill="#1e293b"/>
+  <!-- Outer border -->
+  <rect x="72" y="72" width="368" height="368" rx="12" fill="none" stroke="#6366f1" stroke-width="14"/>
+  <!-- Horizontal box dividers -->
+  <line x1="72" y1="195" x2="440" y2="195" stroke="#6366f1" stroke-width="8"/>
+  <line x1="72" y1="317" x2="440" y2="317" stroke="#6366f1" stroke-width="8"/>
+  <!-- Vertical box dividers -->
+  <line x1="195" y1="72" x2="195" y2="440" stroke="#6366f1" stroke-width="8"/>
+  <line x1="317" y1="72" x2="317" y2="440" stroke="#6366f1" stroke-width="8"/>
+  <!-- A few numbers for character -->
+  <text x="133" y="168" font-family="monospace,sans-serif" font-size="72" font-weight="bold" fill="#818cf8" text-anchor="middle" dominant-baseline="middle">5</text>
+  <text x="256" y="168" font-family="monospace,sans-serif" font-size="72" font-weight="bold" fill="#4ade80" text-anchor="middle" dominant-baseline="middle">3</text>
+  <text x="379" y="290" font-family="monospace,sans-serif" font-size="72" font-weight="bold" fill="#818cf8" text-anchor="middle" dominant-baseline="middle">7</text>
+  <text x="133" y="379" font-family="monospace,sans-serif" font-size="72" font-weight="bold" fill="#818cf8" text-anchor="middle" dominant-baseline="middle">9</text>
+  <text x="256" y="379" font-family="monospace,sans-serif" font-size="72" font-weight="bold" fill="#4ade80" text-anchor="middle" dominant-baseline="middle">1</text>
+</svg>
