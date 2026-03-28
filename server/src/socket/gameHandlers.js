@@ -93,6 +93,18 @@ export function registerGameHandlers(io, socket) {
     }
   });
 
+  socket.on('leave-game', ({ roomId }) => {
+    const room = getRoom(roomId);
+    if (!room) return;
+    if (room.status === 'waiting') {
+      deleteRoom(roomId);
+    } else if (room.status === 'playing') {
+      room.status = 'finished';
+      socket.to(roomId).emit('opponent-disconnected');
+      setTimeout(() => deleteRoom(roomId), 5_000);
+    }
+  });
+
   socket.on('disconnect', () => {
     const room = findRoomBySocketId(socket.id);
     if (!room) return;

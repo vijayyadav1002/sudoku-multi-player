@@ -96,7 +96,10 @@ export default function Room() {
           </div>
 
           <button
-            onClick={() => navigate('/')}
+            onClick={() => {
+              socket.emit('leave-game', { roomId });
+              navigate('/');
+            }}
             className="text-slate-600 hover:text-slate-400 text-sm transition-colors"
           >
             Cancel

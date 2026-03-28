@@ -21,6 +21,7 @@ export default function Game() {
   const [myProgress, setMyProgress] = useState(0);
   const [opponentProgress, setOpponentProgress] = useState(0);
   const [gameOver, setGameOver] = useState(false);
+  const [showQuitConfirm, setShowQuitConfirm] = useState(false);
 
   useEffect(() => {
     if (!state?.puzzle) {
@@ -55,6 +56,11 @@ export default function Game() {
       socket.off('opponent-disconnected', handleOpponentDisconnected);
     };
   }, [socket, navigate, roomId, state]);
+
+  function handleQuit() {
+    socket.emit('leave-game', { roomId });
+    navigate('/');
+  }
 
   const handleCellChange = useCallback((index, value) => {
     if (gameOver || !state?.puzzle) return;
@@ -91,7 +97,35 @@ export default function Game() {
         {/* Header */}
         <div className="flex items-center justify-between w-full">
           <h1 className="text-lg font-bold text-slate-200">Sudoku Battle</h1>
-          <Timer running={!gameOver} />
+          <div className="flex items-center gap-3">
+            {!gameOver && (
+              showQuitConfirm ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-400 text-xs">Quit?</span>
+                  <button
+                    onClick={handleQuit}
+                    className="text-red-400 hover:text-red-300 text-xs font-medium transition-colors"
+                  >
+                    Yes
+                  </button>
+                  <button
+                    onClick={() => setShowQuitConfirm(false)}
+                    className="text-slate-500 hover:text-slate-400 text-xs transition-colors"
+                  >
+                    No
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowQuitConfirm(true)}
+                  className="text-slate-500 hover:text-red-400 text-sm transition-colors"
+                >
+                  Quit
+                </button>
+              )
+            )}
+            <Timer running={!gameOver} />
+          </div>
         </div>
 
         {/* Player statuses */}
