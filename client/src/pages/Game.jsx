@@ -7,6 +7,14 @@ import PlayerStatus from '../components/PlayerStatus';
 import Timer from '../components/Timer';
 import { calcClientProgress, isCellGiven } from '../lib/sudokuHelpers';
 
+function toMilestone(progress) {
+  if (progress >= 100) return 100;
+  if (progress >= 75) return 75;
+  if (progress >= 50) return 50;
+  if (progress >= 25) return 25;
+  return 0;
+}
+
 export default function Game() {
   const { roomId } = useParams();
   const navigate = useNavigate();
@@ -30,7 +38,7 @@ export default function Game() {
     }
 
     function handleOpponentProgress({ progress }) {
-      setOpponentProgress(progress);
+      setOpponentProgress(toMilestone(progress));
     }
 
     function handleGameOver(data) {
@@ -70,7 +78,7 @@ export default function Game() {
       const next = [...prev];
       next[index] = value;
       const progress = calcClientProgress(next, state.puzzle, state.solution);
-      setMyProgress(progress);
+      setMyProgress(toMilestone(progress));
       socket.emit('cell-update', { roomId, index, value });
       return next;
     });
