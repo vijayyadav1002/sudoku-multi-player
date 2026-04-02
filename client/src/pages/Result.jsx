@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
 import { formatDuration } from '../lib/sudokuHelpers';
@@ -17,6 +18,26 @@ export default function Result() {
   const isWinner = winnerSocketId === socket.id;
   const myNickname = state.nickname;
   const opponentNickname = state.opponentNickname || 'Opponent';
+
+  const [history, setHistory] = useState(() =>
+    JSON.parse(localStorage.getItem('sudoku-battle-history') || '[]')
+  );
+
+  useEffect(() => {
+    if (opponentDisconnected) return;
+    const record = {
+      outcome: isWinner ? 'win' : 'loss',
+      opponentNickname,
+      difficulty: state.difficulty || 'medium',
+      duration: duration ?? null,
+      loserProgress: loserProgress ?? 0,
+      date: new Date().toISOString(),
+    };
+    const prev = JSON.parse(localStorage.getItem('sudoku-battle-history') || '[]');
+    const updated = [record, ...prev].slice(0, 20);
+    localStorage.setItem('sudoku-battle-history', JSON.stringify(updated));
+    setHistory(updated);
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
@@ -92,6 +113,29 @@ export default function Result() {
         >
           Play Again
         </button>
+
+        {history.length > 0 && (
+          <div className="bg-slate-800 rounded-2xl p-4">
+            <p className="text-slate-400 text-xs uppercase tracking-widest mb-3">Battle History</p>
+            <div className="space-y-1 max-h-48 overflow-y-auto">
+              {history.map((r, i) => (
+                <div key={i} className="flex items-center gap-2 text-sm px-1 py-1.5 border-b border-slate-700/50 last:border-0">
+                  <span className={`text-xs font-bold w-5 ${r.outcome === 'win' ? 'text-green-400' : 'text-red-400'}`}>
+                    {r.outcome === 'win' ? 'W' : 'L'}
+                  </span>
+                  <span className="text-slate-300 capitalize w-12">{r.difficulty}</span>
+                  <span className="text-slate-400 flex-1 truncate">vs {r.opponentNickname}</span>
+                  <span className="font-mono text-white text-xs">
+                    {r.duration != null ? formatDuration(r.duration) : '—'}
+                  </span>
+                  <span className="text-slate-500 text-xs w-14 text-right">
+                    {new Date(r.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

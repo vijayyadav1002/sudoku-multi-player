@@ -25,6 +25,9 @@ export default function Solo() {
   const [timerRunning, setTimerRunning] = useState(false);
   const [finalTime, setFinalTime] = useState(0);
   const elapsedRef = useRef(0);
+  const [history, setHistory] = useState(() =>
+    JSON.parse(localStorage.getItem('sudoku-solo-history') || '[]')
+  );
 
   useEffect(() => {
     if (!timerRunning) return;
@@ -73,8 +76,14 @@ export default function Solo() {
       setProgress(p);
       if (p === 100) {
         setTimerRunning(false);
-        setFinalTime(elapsedRef.current);
+        const t = elapsedRef.current;
+        setFinalTime(t);
         setCompleted(true);
+        const record = { difficulty, time: t, date: new Date().toISOString() };
+        const prev = JSON.parse(localStorage.getItem('sudoku-solo-history') || '[]');
+        const updated = [record, ...prev].slice(0, 20);
+        localStorage.setItem('sudoku-solo-history', JSON.stringify(updated));
+        setHistory(updated);
       }
       return next;
     });
@@ -168,6 +177,24 @@ export default function Solo() {
           >
             Home
           </button>
+
+          {history.length > 0 && (
+            <div className="bg-slate-800 rounded-2xl p-4">
+              <p className="text-slate-400 text-xs uppercase tracking-widest mb-3">Your Records</p>
+              <div className="space-y-1 max-h-48 overflow-y-auto">
+                {history.map((r, i) => (
+                  <div key={i} className="flex items-center justify-between text-sm px-1 py-1.5 border-b border-slate-700/50 last:border-0">
+                    <span className="text-slate-500 w-6">#{i + 1}</span>
+                    <span className="text-slate-300 capitalize flex-1">{r.difficulty}</span>
+                    <span className="font-mono text-white">{formatDuration(r.time)}</span>
+                    <span className="text-slate-500 text-xs ml-3 w-14 text-right">
+                      {new Date(r.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
