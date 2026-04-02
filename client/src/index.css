@@ -6,7 +6,14 @@
   box-sizing: border-box;
 }
 
+html {
+  background-color: #0f172a;
+}
+
 body {
   margin: 0;
+  background-color: #0f172a;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
   -webkit-tap-highlight-color: transparent;
 }
