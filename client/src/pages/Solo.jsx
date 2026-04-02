@@ -7,6 +7,14 @@ import { calcClientProgress, isCellGiven, formatDuration } from '../lib/sudokuHe
 const API_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
 const DIFFICULTIES = ['easy', 'medium', 'hard'];
 
+function toMilestone(progress) {
+  if (progress >= 100) return 100;
+  if (progress >= 75) return 75;
+  if (progress >= 50) return 50;
+  if (progress >= 25) return 25;
+  return 0;
+}
+
 export default function Solo() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -73,7 +81,7 @@ export default function Solo() {
       const next = [...prev];
       next[index] = value;
       const p = calcClientProgress(next, puzzle, solution);
-      setProgress(p);
+      setProgress(toMilestone(p));
       if (p === 100) {
         setTimerRunning(false);
         const t = elapsedRef.current;
