@@ -5,6 +5,7 @@ import Room from './pages/Room';
 import Game from './pages/Game';
 import Result from './pages/Result';
 import Solo from './pages/Solo';
+import History from './pages/History';
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
           <Route path="/game/:roomId" element={<Game />} />
           <Route path="/result/:roomId" element={<Result />} />
           <Route path="/solo" element={<Solo />} />
+          <Route path="/history" element={<History />} />
         </Routes>
       </BrowserRouter>
     </SocketProvider>

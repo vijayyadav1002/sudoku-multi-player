@@ -261,7 +261,16 @@ export default function Home() {
           )}
         </div>
 
-        <p className="text-center text-slate-600 text-xs mt-6">
+        <div className="text-center mt-2">
+          <button
+            onClick={() => navigate('/history')}
+            className="text-slate-500 hover:text-slate-300 text-sm transition-colors"
+          >
+            View History
+          </button>
+        </div>
+
+        <p className="text-center text-slate-600 text-xs mt-4">
           Two players · Same puzzle · First to finish wins
         </p>
       </div>
