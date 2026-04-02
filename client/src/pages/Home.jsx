@@ -120,18 +120,26 @@ export default function Home() {
 
           {/* Mode selection */}
           {mode === null && (
-            <div className="grid grid-cols-2 gap-3 pt-1">
+            <div className="space-y-2 pt-1">
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => { setError(''); setMode('create'); }}
+                  className="bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold rounded-xl py-3 transition-colors"
+                >
+                  Create Room
+                </button>
+                <button
+                  onClick={() => { setError(''); setMode('join'); }}
+                  className="bg-slate-700 hover:bg-slate-600 active:bg-slate-900 text-white font-semibold rounded-xl py-3 transition-colors border border-slate-600"
+                >
+                  Join Room
+                </button>
+              </div>
               <button
-                onClick={() => { setError(''); setMode('create'); }}
-                className="bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold rounded-xl py-3 transition-colors"
+                onClick={() => { setError(''); setMode('solo'); }}
+                className="w-full bg-slate-700 hover:bg-slate-600 active:bg-slate-900 text-slate-300 font-semibold rounded-xl py-3 transition-colors border border-slate-600"
               >
-                Create Room
-              </button>
-              <button
-                onClick={() => { setError(''); setMode('join'); }}
-                className="bg-slate-700 hover:bg-slate-600 active:bg-slate-900 text-white font-semibold rounded-xl py-3 transition-colors border border-slate-600"
-              >
-                Join Room
+                Solo
               </button>
             </div>
           )}
@@ -207,6 +215,46 @@ export default function Home() {
                   className="flex-1 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white font-semibold rounded-xl py-3 transition-colors"
                 >
                   {loading ? 'Joining...' : 'Join Room'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Solo flow */}
+          {mode === 'solo' && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Difficulty
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {DIFFICULTIES.map(d => (
+                    <button
+                      key={d}
+                      onClick={() => setDifficulty(d)}
+                      className={`py-2.5 rounded-xl font-medium capitalize text-sm transition-colors ${
+                        difficulty === d
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setError(''); setMode(null); }}
+                  className="flex-1 bg-slate-700 text-slate-300 rounded-xl py-3 hover:bg-slate-600 transition-colors"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={() => navigate('/solo', { state: { difficulty, nickname: nickname.trim() } })}
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl py-3 transition-colors"
+                >
+                  Start
                 </button>
               </div>
             </div>
