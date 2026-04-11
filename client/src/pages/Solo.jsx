@@ -118,7 +118,7 @@ export default function Solo() {
 
   if (loading) {
     return (
-      <div className="min-h-dvh bg-slate-900 flex items-center justify-center">
+      <div className="min-h-full bg-slate-900 flex items-center justify-center">
         <p className="text-slate-400 text-sm">Loading puzzle…</p>
       </div>
     );
@@ -126,7 +126,7 @@ export default function Solo() {
 
   if (error) {
     return (
-      <div className="min-h-dvh bg-slate-900 flex items-center justify-center p-4">
+      <div className="min-h-full bg-slate-900 flex items-center justify-center p-4">
         <div className="text-center space-y-4">
           <p className="text-red-400 text-sm">{error}</p>
           <button
@@ -142,7 +142,7 @@ export default function Solo() {
 
   if (completed) {
     return (
-      <div className="min-h-dvh bg-slate-900 flex items-center justify-center p-4">
+      <div className="min-h-full bg-slate-900 flex items-center justify-center p-4">
         <div className="w-full max-w-sm space-y-4">
           <div className="bg-green-950 border border-green-700 rounded-2xl p-8 text-center shadow-xl">
             <div className="text-6xl mb-4">🎉</div>
@@ -209,7 +209,7 @@ export default function Solo() {
   }
 
   return (
-    <div className="min-h-dvh bg-slate-900 text-white flex flex-col">
+    <div className="min-h-full bg-slate-900 text-white flex flex-col">
       <div className="flex flex-col items-center gap-4 p-4 pb-6 w-full max-w-lg mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between w-full">
