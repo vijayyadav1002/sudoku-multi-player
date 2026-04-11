@@ -7,13 +7,21 @@
 }
 
 html {
+  height: 100dvh;
   background-color: #0f172a;
 }
 
 body {
   margin: 0;
+  height: 100%;
   background-color: #0f172a;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#root {
+  height: 100%;
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
-  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+  overflow-y: auto;
 }

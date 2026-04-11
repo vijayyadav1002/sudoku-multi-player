@@ -87,7 +87,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-dvh bg-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-full bg-slate-900 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
