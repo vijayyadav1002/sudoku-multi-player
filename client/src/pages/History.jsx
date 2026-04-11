@@ -20,7 +20,7 @@ export default function History() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white flex flex-col">
+    <div className="min-h-dvh bg-slate-900 text-white flex flex-col">
       <div className="flex flex-col w-full max-w-lg mx-auto p-4 gap-6">
         {/* Header */}
         <div className="flex items-center justify-between">

@@ -100,7 +100,7 @@ export default function Game() {
   const opponentNickname = state.opponentNickname || 'Opponent';
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white flex flex-col">
+    <div className="min-h-dvh bg-slate-900 text-white flex flex-col">
       <div className="flex flex-col items-center gap-4 p-4 pb-6 w-full max-w-lg mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between w-full">
