@@ -93,7 +93,7 @@ export default function History() {
                       {r.outcome === 'win' ? 'W' : 'L'}
                     </span>
                     <span className="text-slate-300 capitalize w-12">{r.difficulty}</span>
-                    <span className="text-slate-400 flex-1 truncate">vs {r.opponentNickname}</span>
+                    <span className="text-slate-400 flex-1 truncate text-xs">#{r.myRank ?? '?'}/{r.playerCount ?? '?'} · {r.winnerNickname ? `${r.winnerNickname} won` : ''}</span>
                     <span className="font-mono text-white text-xs">
                       {r.duration != null ? formatDuration(r.duration) : '—'}
                     </span>

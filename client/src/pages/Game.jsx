@@ -1,19 +1,11 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
 import SudokuBoard from '../components/SudokuBoard';
 import NumberPad from '../components/NumberPad';
-import PlayerStatus from '../components/PlayerStatus';
+import PlayerProgressStrip from '../components/PlayerProgressStrip';
 import Timer from '../components/Timer';
 import { calcClientProgress, isCellGiven } from '../lib/sudokuHelpers';
-
-function toMilestone(progress) {
-  if (progress >= 100) return 100;
-  if (progress >= 75) return 75;
-  if (progress >= 50) return 50;
-  if (progress >= 25) return 25;
-  return 0;
-}
 
 export default function Game() {
   const { roomId } = useParams();
@@ -22,14 +14,22 @@ export default function Game() {
   const socket = useSocket();
   const state = location.state;
 
+  const mySocketId = state?.mySocketId ?? socket.id;
+
   const [board, setBoard] = useState(() =>
     state?.puzzle ? [...state.puzzle] : []
   );
   const [selectedCell, setSelectedCell] = useState(null);
-  const [myProgress, setMyProgress] = useState(0);
-  const [opponentProgress, setOpponentProgress] = useState(0);
+  const [activePlayers, setActivePlayers] = useState(state?.players ?? []);
+  const [playersProgress, setPlayersProgress] = useState(() => {
+    const map = new Map();
+    (state?.players ?? []).forEach(p => map.set(p.socketId, 0));
+    return map;
+  });
   const [gameOver, setGameOver] = useState(false);
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
+  const [disconnectMsg, setDisconnectMsg] = useState(null);
+  const disconnectTimer = useRef(null);
 
   useEffect(() => {
     if (!state?.puzzle) {
@@ -37,8 +37,24 @@ export default function Game() {
       return;
     }
 
-    function handleOpponentProgress({ progress }) {
-      setOpponentProgress(toMilestone(progress));
+    function handlePlayersProgress({ updates }) {
+      setPlayersProgress(prev => {
+        const next = new Map(prev);
+        updates.forEach(({ socketId, progress }) => next.set(socketId, progress));
+        return next;
+      });
+    }
+
+    function handlePlayerLeft({ socketId, nickname, remainingPlayers }) {
+      setActivePlayers(remainingPlayers);
+      setPlayersProgress(prev => {
+        const next = new Map(prev);
+        next.delete(socketId);
+        return next;
+      });
+      setDisconnectMsg(`${nickname} left the game`);
+      clearTimeout(disconnectTimer.current);
+      disconnectTimer.current = setTimeout(() => setDisconnectMsg(null), 3000);
     }
 
     function handleGameOver(data) {
@@ -48,20 +64,15 @@ export default function Game() {
       });
     }
 
-    function handleOpponentDisconnected() {
-      navigate(`/result/${roomId}`, {
-        state: { ...state, opponentDisconnected: true },
-      });
-    }
-
-    socket.on('opponent-progress', handleOpponentProgress);
+    socket.on('players-progress', handlePlayersProgress);
+    socket.on('player-left', handlePlayerLeft);
     socket.on('game-over', handleGameOver);
-    socket.on('opponent-disconnected', handleOpponentDisconnected);
 
     return () => {
-      socket.off('opponent-progress', handleOpponentProgress);
+      socket.off('players-progress', handlePlayersProgress);
+      socket.off('player-left', handlePlayerLeft);
       socket.off('game-over', handleGameOver);
-      socket.off('opponent-disconnected', handleOpponentDisconnected);
+      clearTimeout(disconnectTimer.current);
     };
   }, [socket, navigate, roomId, state]);
 
@@ -78,11 +89,11 @@ export default function Game() {
       const next = [...prev];
       next[index] = value;
       const progress = calcClientProgress(next, state.puzzle, state.solution);
-      setMyProgress(toMilestone(progress));
+      setPlayersProgress(pm => new Map(pm).set(mySocketId, progress));
       socket.emit('cell-update', { roomId, index, value });
       return next;
     });
-  }, [socket, roomId, state, gameOver]);
+  }, [socket, roomId, state, gameOver, mySocketId]);
 
   function handleNumberPad(num) {
     if (selectedCell === null) return;
@@ -97,11 +108,12 @@ export default function Game() {
 
   if (!state?.puzzle) return null;
 
-  const opponentNickname = state.opponentNickname || 'Opponent';
+  const boardWidth = 'min(calc(100vw - 2rem), 400px)';
 
   return (
     <div className="min-h-full bg-slate-900 text-white flex flex-col">
-      <div className="flex flex-col items-center gap-4 p-4 pb-6 w-full max-w-lg mx-auto">
+      <div className="flex flex-col items-center gap-4 p-4 pb-6 w-full">
+        <div className="flex flex-col gap-4 w-full" style={{ maxWidth: boardWidth }}>
         {/* Header */}
         <div className="flex items-center justify-between w-full">
           <h1 className="text-lg font-bold text-slate-200">Sudoku Battle</h1>
@@ -136,19 +148,19 @@ export default function Game() {
           </div>
         </div>
 
-        {/* Player statuses */}
-        <div className="grid grid-cols-2 gap-3 w-full">
-          <PlayerStatus
-            nickname={state.nickname}
-            progress={myProgress}
-            isYou
-          />
-          <PlayerStatus
-            nickname={opponentNickname}
-            progress={opponentProgress}
-            isOpponent
-          />
-        </div>
+        {/* Disconnect banner */}
+        {disconnectMsg && (
+          <div className="w-full bg-slate-700 text-slate-300 text-xs text-center rounded-lg py-2 px-3">
+            {disconnectMsg}
+          </div>
+        )}
+
+        {/* Player progress strip */}
+        <PlayerProgressStrip
+          players={activePlayers}
+          playersProgress={playersProgress}
+          mySocketId={mySocketId}
+        />
 
         {/* Sudoku board */}
         <SudokuBoard
@@ -171,6 +183,7 @@ export default function Game() {
         <p className="text-slate-600 text-xs capitalize">
           {state.difficulty} · Room {roomId}
         </p>
+        </div>
       </div>
     </div>
   );

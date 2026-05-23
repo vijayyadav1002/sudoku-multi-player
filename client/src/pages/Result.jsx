@@ -14,23 +14,25 @@ export default function Result() {
     return null;
   }
 
-  const { opponentDisconnected, winnerSocketId, winnerNickname, loserNickname, loserProgress, duration } = state;
-  const isWinner = winnerSocketId === socket.id;
-  const myNickname = state.nickname;
-  const opponentNickname = state.opponentNickname || 'Opponent';
+  const { leaderboard = [], winnerSocketId, winnerNickname, totalDuration, autoWin } = state;
+  const mySocketId = state.mySocketId ?? socket.id;
+  const isWinner = winnerSocketId === mySocketId;
+  const myEntry = leaderboard.find(e => e.socketId === mySocketId);
+  const myRank = myEntry?.rank ?? null;
 
   const [history, setHistory] = useState(() =>
     JSON.parse(localStorage.getItem('sudoku-battle-history') || '[]')
   );
 
   useEffect(() => {
-    if (opponentDisconnected) return;
     const record = {
       outcome: isWinner ? 'win' : 'loss',
-      opponentNickname,
+      winnerNickname: winnerNickname ?? '',
       difficulty: state.difficulty || 'medium',
-      duration: duration ?? null,
-      loserProgress: loserProgress ?? 0,
+      duration: totalDuration ?? null,
+      playerCount: leaderboard.length,
+      myRank: myRank ?? leaderboard.length,
+      myProgress: myEntry?.progress ?? 0,
       date: new Date().toISOString(),
     };
     const prev = JSON.parse(localStorage.getItem('sudoku-battle-history') || '[]');
@@ -39,74 +41,74 @@ export default function Result() {
     setHistory(updated);
   }, []);
 
+  const headerEmoji = autoWin ? '🏆' : isWinner ? '🏆' : '💪';
+  const headerText = autoWin
+    ? 'All opponents left — you win!'
+    : isWinner
+    ? 'You won!'
+    : `${winnerNickname} won!`;
+
   return (
     <div className="min-h-full bg-slate-900 flex items-center justify-center p-4">
       <div className="w-full max-w-sm space-y-4">
         {/* Result card */}
         <div
-          className={`rounded-2xl p-8 text-center shadow-xl ${
-            opponentDisconnected
-              ? 'bg-slate-800 border border-slate-600'
-              : isWinner
+          className={`rounded-2xl p-6 shadow-xl ${
+            isWinner || autoWin
               ? 'bg-green-950 border border-green-700'
               : 'bg-slate-800 border border-slate-600'
           }`}
         >
-          <div className="text-6xl mb-4">
-            {opponentDisconnected ? '🔌' : isWinner ? '🏆' : '💪'}
+          <div className="text-center mb-4">
+            <div className="text-5xl mb-3">{headerEmoji}</div>
+            <h1 className={`text-2xl font-bold ${isWinner || autoWin ? 'text-green-400' : 'text-slate-100'}`}>
+              {headerText}
+            </h1>
+            {totalDuration != null && !autoWin && (
+              <p className="text-slate-400 text-sm mt-1">
+                Winner's time: <span className="font-mono font-bold text-white">{formatDuration(totalDuration)}</span>
+              </p>
+            )}
           </div>
 
-          <h1
-            className={`text-3xl font-bold mb-1 ${
-              isWinner && !opponentDisconnected ? 'text-green-400' : 'text-slate-100'
-            }`}
-          >
-            {opponentDisconnected
-              ? 'Opponent left'
-              : isWinner
-              ? 'You won!'
-              : `${winnerNickname} won!`}
-          </h1>
-
-          {opponentDisconnected ? (
-            <p className="text-slate-400 text-sm mt-2">Your opponent disconnected from the game.</p>
-          ) : (
-            <>
-              <p className="text-slate-400 text-sm mb-6">
-                {isWinner
-                  ? `You finished before ${loserNickname}!`
-                  : `Keep practicing — you'll get them next time!`}
-              </p>
-
-              {/* Score breakdown */}
-              <div className="space-y-3">
-                <div className="flex justify-between items-center text-sm bg-slate-800/50 rounded-xl px-4 py-3">
-                  <span className="text-slate-300">{myNickname} (you)</span>
-                  <span className={`font-bold text-lg ${isWinner ? 'text-green-400' : 'text-slate-200'}`}>
-                    {isWinner ? '100%' : `${loserProgress}%`}
+          {/* Leaderboard */}
+          <div className="space-y-1.5">
+            {leaderboard.map((entry) => {
+              const isMe = entry.socketId === mySocketId;
+              const isFirst = entry.rank === 1;
+              return (
+                <div
+                  key={entry.socketId}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${
+                    isMe
+                      ? 'bg-indigo-900/60 border border-indigo-700'
+                      : 'bg-slate-800/60'
+                  }`}
+                >
+                  <span
+                    className={`font-bold w-6 text-center flex-shrink-0 ${
+                      isFirst ? 'text-yellow-400' : 'text-slate-500'
+                    }`}
+                  >
+                    #{entry.rank}
+                  </span>
+                  <span className="text-slate-200 truncate flex-1">
+                    {entry.nickname}
+                    {isMe && <span className="text-slate-500 ml-1">(you)</span>}
+                  </span>
+                  <span className={`font-bold tabular-nums flex-shrink-0 ${isFirst ? 'text-yellow-400' : 'text-slate-300'}`}>
+                    {entry.progress}%
+                  </span>
+                  <span className="font-mono text-slate-500 text-xs flex-shrink-0 w-12 text-right">
+                    {entry.duration != null ? formatDuration(entry.duration) : '—'}
                   </span>
                 </div>
-                <div className="flex justify-between items-center text-sm bg-slate-800/50 rounded-xl px-4 py-3">
-                  <span className="text-slate-300">{opponentNickname}</span>
-                  <span className={`font-bold text-lg ${!isWinner ? 'text-green-400' : 'text-slate-200'}`}>
-                    {isWinner ? `${loserProgress}%` : '100%'}
-                  </span>
-                </div>
-
-                {duration != null && (
-                  <div className="pt-2 border-t border-slate-700/50">
-                    <p className="text-slate-500 text-xs uppercase tracking-widest mb-1">Winner's time</p>
-                    <p className="text-3xl font-mono font-bold text-white">
-                      {formatDuration(duration)}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
+              );
+            })}
+          </div>
         </div>
 
-        {/* Actions */}
+        {/* Play again */}
         <button
           onClick={() => navigate('/')}
           className="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold rounded-xl py-3.5 transition-colors"
@@ -114,6 +116,7 @@ export default function Result() {
           Play Again
         </button>
 
+        {/* Battle history */}
         {history.length > 0 && (
           <div className="bg-slate-800 rounded-2xl p-4">
             <p className="text-slate-400 text-xs uppercase tracking-widest mb-3">Battle History</p>
@@ -124,7 +127,9 @@ export default function Result() {
                     {r.outcome === 'win' ? 'W' : 'L'}
                   </span>
                   <span className="text-slate-300 capitalize w-12">{r.difficulty}</span>
-                  <span className="text-slate-400 flex-1 truncate">vs {r.opponentNickname}</span>
+                  <span className="text-slate-400 flex-1 truncate text-xs">
+                    #{r.myRank ?? '?'}/{r.playerCount ?? '?'} · {r.winnerNickname ? `${r.winnerNickname} won` : ''}
+                  </span>
                   <span className="font-mono text-white text-xs">
                     {r.duration != null ? formatDuration(r.duration) : '—'}
                   </span>

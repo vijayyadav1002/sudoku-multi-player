@@ -46,6 +46,8 @@ export default function Home() {
           solution: res.solution,
           difficulty: res.difficulty,
           nickname: nickname.trim(),
+          isHost: true,
+          players: res.players,
         },
       });
     });
@@ -67,13 +69,14 @@ export default function Home() {
       clearTimeout(timeout);
       setLoading(false);
       if (!res.ok) return setError(res.error || 'Failed to join room');
-      navigate(`/game/${res.roomId}`, {
+      navigate(`/room/${res.roomId}`, {
         state: {
           puzzle: res.puzzle,
           solution: res.solution,
           difficulty: res.difficulty,
           nickname: nickname.trim(),
-          opponentNickname: res.opponentNickname,
+          isHost: false,
+          players: res.players,
         },
       });
     });
@@ -271,7 +274,7 @@ export default function Home() {
         </div>
 
         <p className="text-center text-slate-600 text-xs mt-4">
-          Two players · Same puzzle · First to finish wins
+          Up to 10 players · Same puzzle · First to finish wins
         </p>
       </div>
     </div>
