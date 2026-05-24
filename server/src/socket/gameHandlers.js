@@ -6,8 +6,12 @@ import {
   createRoom, getRoom, addPlayer, removePlayer,
   getPlayerSummaries, isHost, startGame, buildLeaderboard,
   updatePlayerCell, calcProgress, findRoomBySocketId, deleteRoom,
-  MAX_PLAYERS,
+  getPublicRooms, MAX_PLAYERS,
 } from '../game/roomManager.js';
+
+function broadcastPublicRooms(io) {
+  io.to('lobby').emit('public-rooms-updated', { rooms: getPublicRooms() });
+}
 
 function handleLeaveOrDisconnect(io, socket, room) {
   if (!room) return;
@@ -16,6 +20,7 @@ function handleLeaveOrDisconnect(io, socket, room) {
     if (isHost(room.id, socket.id)) {
       io.to(room.id).emit('room-closed', { reason: 'host-left' });
       deleteRoom(room.id);
+      broadcastPublicRooms(io);
     } else {
       const result = removePlayer(room.id, socket.id);
       if (result) {
@@ -24,6 +29,7 @@ function handleLeaveOrDisconnect(io, socket, room) {
           players: summaries,
           canStart: summaries.length >= 2,
         });
+        broadcastPublicRooms(io);
       }
     }
   } else if (room.status === 'playing') {
@@ -33,6 +39,7 @@ function handleLeaveOrDisconnect(io, socket, room) {
 
     if (room.players.length === 0) {
       deleteRoom(room.id);
+      broadcastPublicRooms(io);
     } else if (room.players.length === 1) {
       room.status = 'finished';
       const leaderboard = buildLeaderboard(room);
@@ -61,11 +68,20 @@ function handleLeaveOrDisconnect(io, socket, room) {
 }
 
 export function registerGameHandlers(io, socket) {
-  socket.on('create-room', ({ nickname, difficulty }, callback) => {
+  socket.on('join-lobby', () => {
+    socket.join('lobby');
+    socket.emit('public-rooms-updated', { rooms: getPublicRooms() });
+  });
+
+  socket.on('leave-lobby', () => {
+    socket.leave('lobby');
+  });
+
+  socket.on('create-room', ({ nickname, difficulty, isPublic }, callback) => {
     try {
       const roomId = nanoid();
       const { puzzle, solution } = generatePuzzle(difficulty);
-      createRoom(roomId, difficulty, puzzle, solution, socket.id);
+      createRoom(roomId, difficulty, puzzle, solution, socket.id, isPublic ?? false);
       addPlayer(roomId, socket.id, nickname);
       socket.join(roomId);
       const room = getRoom(roomId);
@@ -77,8 +93,10 @@ export function registerGameHandlers(io, socket) {
         solution,
         difficulty,
         isHost: true,
+        isPublic: room.isPublic,
         players,
       });
+      broadcastPublicRooms(io);
     } catch {
       callback({ ok: false, error: 'Failed to create room' });
     }
@@ -98,6 +116,8 @@ export function registerGameHandlers(io, socket) {
       players: summaries,
       canStart: summaries.length >= 2,
     });
+
+    broadcastPublicRooms(io);
 
     callback({
       ok: true,
@@ -126,6 +146,7 @@ export function registerGameHandlers(io, socket) {
       startedAt: room.startedAt.getTime(),
     });
 
+    broadcastPublicRooms(io);
     callback({ ok: true });
   });
 

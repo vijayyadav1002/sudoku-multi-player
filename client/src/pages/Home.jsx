@@ -6,15 +6,6 @@ import { PLAYER_PALETTE, avatarGradient } from '../lib/players';
 
 const DIFFICULTIES = ['easy', 'medium', 'hard'];
 
-const PUBLIC_ROOMS = [
-  { code: 'OVHEN6', host: 'Mira',  hostId: 'p3', diff: 'Medium', players: ['p3','p2','p1'], spots: 6, region: 'EU', ping: 38,  ranked: true,  startsIn: '0:42' },
-  { code: 'QZRT19', host: 'Dan',   hostId: 'p2', diff: 'Hard',   players: ['p2','p4'],      spots: 4, region: 'NA', ping: 22,  ranked: true,  startsIn: 'now' },
-  { code: 'AB7K3X', host: 'Aria',  hostId: 'p5', diff: 'Easy',   players: ['p5','p6','p1','p3'], spots: 6, region: 'SA', ping: 145, ranked: false, startsIn: '1:08' },
-  { code: 'MX22LP', host: 'Kai',   hostId: 'p4', diff: 'Medium', players: ['p4','p2'],      spots: 4, region: 'EU', ping: 64,  ranked: false, startsIn: '2:15' },
-  { code: 'JN9PVB', host: 'Yuki',  hostId: 'p3', diff: 'Hard',   players: ['p3','p5','p6'], spots: 6, region: 'AS', ping: 110, ranked: true,  startsIn: 'now' },
-  { code: 'WT5KEN', host: 'Theo',  hostId: 'p2', diff: 'Medium', players: ['p2'],           spots: 4, region: 'EU', ping: 52,  ranked: false, startsIn: '3:30' },
-];
-
 function Logo() {
   return (
     <div className="logo">
@@ -41,6 +32,9 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [diffFilter, setDiffFilter] = useState('All');
+  const [isPublic, setIsPublic] = useState(false);
+  const [publicRooms, setPublicRooms] = useState([]);
+  const [roomsLoading, setRoomsLoading] = useState(true);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -55,6 +49,19 @@ export default function Home() {
     }
   }, [user]);
 
+  useEffect(() => {
+    socket.emit('join-lobby');
+    function handleRoomsUpdated({ rooms }) {
+      setPublicRooms(rooms);
+      setRoomsLoading(false);
+    }
+    socket.on('public-rooms-updated', handleRoomsUpdated);
+    return () => {
+      socket.emit('leave-lobby');
+      socket.off('public-rooms-updated', handleRoomsUpdated);
+    };
+  }, [socket]);
+
   function saveAvatar(id) {
     setAvatarId(id);
     localStorage.setItem('sb-avatar', id);
@@ -65,10 +72,22 @@ export default function Home() {
     if (!socket.connected) return setError('Not connected — please refresh.');
     setLoading(true); setError('');
     const timeout = setTimeout(() => { setLoading(false); setError('Server not responding.'); }, 10_000);
-    socket.emit('create-room', { nickname: nickname.trim(), difficulty }, (res) => {
+    socket.emit('create-room', { nickname: nickname.trim(), difficulty, isPublic }, (res) => {
       clearTimeout(timeout); setLoading(false);
       if (!res.ok) return setError(res.error || 'Failed to create room');
-      navigate(`/room/${res.roomId}`, { state: { puzzle: res.puzzle, solution: res.solution, difficulty: res.difficulty, nickname: nickname.trim(), isHost: true, players: res.players, avatarId } });
+      navigate(`/room/${res.roomId}`, { state: { puzzle: res.puzzle, solution: res.solution, difficulty: res.difficulty, nickname: nickname.trim(), isHost: true, isPublic: res.isPublic, players: res.players, avatarId } });
+    });
+  }
+
+  function handleJoinPublicRoom(roomId) {
+    if (!nickname.trim()) return setError('Enter a nickname first');
+    if (!socket.connected) return setError('Not connected — please refresh.');
+    setLoading(true); setError('');
+    const timeout = setTimeout(() => { setLoading(false); setError('Server not responding.'); }, 10_000);
+    socket.emit('join-room', { roomId, nickname: nickname.trim() }, (res) => {
+      clearTimeout(timeout); setLoading(false);
+      if (!res.ok) return setError(res.error || 'Room no longer available');
+      navigate(`/room/${res.roomId}`, { state: { puzzle: res.puzzle, solution: res.solution, difficulty: res.difficulty, nickname: nickname.trim(), isHost: false, players: res.players, avatarId } });
     });
   }
 
@@ -86,7 +105,9 @@ export default function Home() {
     });
   }
 
-  const filteredRooms = diffFilter === 'All' ? PUBLIC_ROOMS : PUBLIC_ROOMS.filter(r => r.diff === diffFilter);
+  const filteredRooms = diffFilter === 'All'
+    ? publicRooms
+    : publicRooms.filter(r => r.difficulty === diffFilter.toLowerCase());
 
   return (
     <div className="screen">
@@ -205,6 +226,17 @@ export default function Home() {
                     ))}
                   </div>
                 </div>
+                <div className="field">
+                  <label className="field-label">Visibility</label>
+                  <div className="diff-row">
+                    <div className={`diff-opt${!isPublic ? ' active' : ''}`} onClick={() => setIsPublic(false)}>
+                      🔒 Private<small>invite only</small>
+                    </div>
+                    <div className={`diff-opt${isPublic ? ' active' : ''}`} onClick={() => setIsPublic(true)}>
+                      🌐 Public<small>open lobby</small>
+                    </div>
+                  </div>
+                </div>
                 <div className="action-row">
                   <button className="btn btn-secondary" onClick={() => { setError(''); setMode(null); }}>Back</button>
                   <button className="btn btn-primary" onClick={handleCreate} disabled={loading}>{loading ? 'Creating…' : 'Create room'}</button>
@@ -273,42 +305,52 @@ export default function Home() {
           </div>
         </div>
         <div className="rooms-grid">
-          {filteredRooms.map(r => {
-            const full = r.players.length >= r.spots;
-            return (
-              <div key={r.code} className={`room-tile card${full ? ' full' : ''}`} onClick={() => !full && setMode('join') && setRoomCode(r.code)}>
-                <div className="room-tile-head">
-                  <span className="vis-chip vis-chip-public">🌐 Public</span>
-                  {r.ranked && <span className="ranked-chip">Ranked</span>}
-                  <span className="qroom-code" style={{ marginLeft: 'auto', color: 'var(--text-faint)' }}>{r.code}</span>
-                </div>
-                <div className="room-tile-host">
-                  <div className="opp-mini-avatar" style={{ background: avatarGradient(r.hostId) }}>{r.host.slice(0,2).toUpperCase()}</div>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 14 }}>{r.host}'s room</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-faint)' }}>{r.diff} · {r.region} · {r.ping}ms</div>
+          {roomsLoading ? (
+            <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '40px 0', color: 'var(--text-faint)', fontSize: 14 }}>
+              Loading rooms…
+            </div>
+          ) : filteredRooms.length === 0 ? (
+            <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '40px 0', color: 'var(--text-faint)', fontSize: 14 }}>
+              No public rooms right now — create one above!
+            </div>
+          ) : (
+            filteredRooms.map(r => {
+              const full = r.playerCount >= r.maxPlayers;
+              const diffLabel = r.difficulty.charAt(0).toUpperCase() + r.difficulty.slice(1);
+              return (
+                <div key={r.id} className={`room-tile card${full ? ' full' : ''}`} onClick={() => !full && handleJoinPublicRoom(r.id)}>
+                  <div className="room-tile-head">
+                    <span className="vis-chip vis-chip-public">🌐 Public</span>
+                    <span className="qroom-code" style={{ marginLeft: 'auto', color: 'var(--text-faint)' }}>{r.id}</span>
                   </div>
-                </div>
-                <div className="room-tile-foot">
-                  <div className="stack">
-                    {r.players.map(pid => (
-                      <div key={pid} style={{ background: avatarGradient(pid) }}>{pid.slice(1)}</div>
-                    ))}
-                    {Array.from({ length: r.spots - r.players.length }).map((_, i) => (
-                      <div key={`e-${i}`} className="stack-empty">+</div>
-                    ))}
-                  </div>
-                  <div className="room-tile-info">
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{r.players.length}<span style={{ color: 'var(--text-faint)' }}>/{r.spots}</span></div>
-                    <div style={{ fontSize: 11, color: r.startsIn === 'now' ? 'oklch(0.78 0.18 150)' : 'var(--text-faint)', fontFamily: 'JetBrains Mono, monospace' }}>
-                      {r.startsIn === 'now' ? 'live' : `starts ${r.startsIn}`}
+                  <div className="room-tile-host">
+                    <div className="opp-mini-avatar" style={{ background: avatarGradient('p1') }}>{r.hostNickname.slice(0,2).toUpperCase()}</div>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>{r.hostNickname}'s room</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-faint)' }}>{diffLabel}</div>
                     </div>
                   </div>
+                  <div className="room-tile-foot">
+                    <div className="stack">
+                      {Array.from({ length: r.playerCount }).map((_, i) => (
+                        <div key={`p-${i}`} style={{ background: avatarGradient(`p${(i % 6) + 1}`) }}>{i + 1}</div>
+                      ))}
+                      {Array.from({ length: r.maxPlayers - r.playerCount }).map((_, i) => (
+                        <div key={`e-${i}`} className="stack-empty">+</div>
+                      ))}
+                    </div>
+                    <div className="room-tile-info">
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{r.playerCount}<span style={{ color: 'var(--text-faint)' }}>/{r.maxPlayers}</span></div>
+                      <div style={{ fontSize: 11, color: 'var(--text-faint)', fontFamily: 'JetBrains Mono, monospace' }}>
+                        waiting
+                      </div>
+                    </div>
+                  </div>
+                  {full && <div className="room-tile-full">Room full</div>}
                 </div>
-                {full && <div className="room-tile-full">Room full</div>}
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </section>
     </div>

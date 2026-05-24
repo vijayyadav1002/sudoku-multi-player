@@ -32,6 +32,7 @@ export default function Room() {
   const [codeCopied, setCodeCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [difficulty, setDifficulty] = useState(state?.difficulty || 'medium');
+  const isPublic = state?.isPublic ?? false;
 
   useEffect(() => {
     if (!state?.nickname) { navigate('/'); return; }
@@ -92,8 +93,8 @@ export default function Room() {
       <div className="lobby">
         <div className="lobby-head">
           <div>
-            <h1>Waiting room <span className="vis-chip vis-chip-private" style={{ marginLeft: 14, verticalAlign: 'middle', fontSize: 12 }}>🔒 Private</span></h1>
-            <div className="sub">Share the code below — only people with the invite can join.</div>
+            <h1>Waiting room <span className={`vis-chip ${isPublic ? 'vis-chip-public' : 'vis-chip-private'}`} style={{ marginLeft: 14, verticalAlign: 'middle', fontSize: 12 }}>{isPublic ? '🌐 Public' : '🔒 Private'}</span></h1>
+            <div className="sub">{isPublic ? 'This room is visible in the public lobby — anyone can join.' : 'Share the code below — only people with the invite can join.'}</div>
           </div>
           <div className="room-code-pill">
             <div>
