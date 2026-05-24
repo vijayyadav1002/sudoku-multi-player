@@ -2,19 +2,24 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import SudokuBoard from '../components/SudokuBoard';
 import NumberPad from '../components/NumberPad';
-import { calcClientProgress, isCellGiven, formatDuration } from '../lib/sudokuHelpers';
+import { calcClientProgress, isCellGiven, formatDuration, toMilestone } from '../lib/sudokuHelpers';
 import { useAuth } from '../context/AuthContext';
 import { saveGame } from '../lib/api';
 
 const API_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
 const DIFFICULTIES = ['easy', 'medium', 'hard'];
 
-function toMilestone(progress) {
-  if (progress >= 100) return 100;
-  if (progress >= 75) return 75;
-  if (progress >= 50) return 50;
-  if (progress >= 25) return 25;
-  return 0;
+function Logo() {
+  return (
+    <div className="logo">
+      <div className="logo-mark">
+        <span className="on" /><span /><span className="on" />
+        <span /><span className="on" /><span />
+        <span className="on" /><span /><span className="on" />
+      </div>
+      <span>Sudoku Battle</span>
+    </div>
+  );
 }
 
 export default function Solo() {
@@ -28,6 +33,7 @@ export default function Solo() {
   const [solution, setSolution] = useState(null);
   const [board, setBoard] = useState([]);
   const [selectedCell, setSelectedCell] = useState(null);
+  const [notesMode, setNotesMode] = useState(false);
   const [progress, setProgress] = useState(0);
   const [completed, setCompleted] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -50,22 +56,15 @@ export default function Solo() {
   }, [timerRunning]);
 
   async function loadPuzzle(diff) {
-    setLoading(true);
-    setError('');
-    setCompleted(false);
-    setProgress(0);
-    setSelectedCell(null);
-    elapsedRef.current = 0;
-    setDisplayElapsed(0);
-    setTimerRunning(false);
+    setLoading(true); setError(''); setCompleted(false);
+    setProgress(0); setSelectedCell(null);
+    elapsedRef.current = 0; setDisplayElapsed(0); setTimerRunning(false);
     try {
       const res = await fetch(`${API_URL}/api/rooms/puzzle?difficulty=${diff}`);
       if (!res.ok) throw new Error();
       const data = await res.json();
-      setPuzzle(data.puzzle);
-      setSolution(data.solution);
-      setBoard([...data.puzzle]);
-      setTimerRunning(true);
+      setPuzzle(data.puzzle); setSolution(data.solution);
+      setBoard([...data.puzzle]); setTimerRunning(true);
     } catch {
       setError('Failed to load puzzle. Please try again.');
     } finally {
@@ -73,9 +72,7 @@ export default function Solo() {
     }
   }
 
-  useEffect(() => {
-    loadPuzzle(difficulty);
-  }, []);
+  useEffect(() => { loadPuzzle(difficulty); }, []);
 
   const handleCellChange = useCallback((index, value) => {
     if (completed || !puzzle) return;
@@ -91,35 +88,21 @@ export default function Solo() {
         setFinalTime(t);
         setCompleted(true);
         const record = { difficulty, time: t, date: new Date().toISOString() };
-        const prev = JSON.parse(localStorage.getItem('sudoku-solo-history') || '[]');
-        const updated = [record, ...prev].slice(0, 20);
+        const prev2 = JSON.parse(localStorage.getItem('sudoku-solo-history') || '[]');
+        const updated = [record, ...prev2].slice(0, 20);
         localStorage.setItem('sudoku-solo-history', JSON.stringify(updated));
         setHistory(updated);
-
         if (session?.access_token) {
-          saveGame(
-            {
-              mode: 'solo',
-              difficulty,
-              playerCount: 1,
-              winnerNickname: nickname || 'Player',
-              totalDuration: t,
-              players: [{
-                isMe: true,
-                nickname: nickname || 'Player',
-                outcome: 'completed',
-                rank: 1,
-                progress: 100,
-                duration: t,
-              }],
-            },
-            session.access_token
-          );
+          saveGame({
+            mode: 'solo', difficulty, playerCount: 1,
+            winnerNickname: nickname || 'Player', totalDuration: t,
+            players: [{ isMe: true, nickname: nickname || 'Player', outcome: 'completed', rank: 1, progress: 100, duration: t }],
+          }, session.access_token);
         }
       }
       return next;
     });
-  }, [puzzle, solution, completed]);
+  }, [puzzle, solution, completed, difficulty, nickname, session]);
 
   function handleNumberPad(num) {
     if (selectedCell === null) return;
@@ -131,34 +114,24 @@ export default function Solo() {
     handleCellChange(selectedCell, 0);
   }
 
-  function handlePlayAgain() {
-    loadPuzzle(difficulty);
-  }
-
-  function handleChangeDifficulty(diff) {
-    setDifficulty(diff);
-    loadPuzzle(diff);
-  }
-
   if (loading) {
     return (
-      <div className="min-h-full bg-slate-900 flex items-center justify-center">
-        <p className="text-slate-400 text-sm">Loading puzzle…</p>
+      <div className="screen" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="bg-orbs"><div className="orb a" /><div className="orb b" /><div className="orb c" /></div>
+        <div className="bg-grid" />
+        <p style={{ color: 'var(--text-dim)', fontSize: 14 }}>Loading puzzle…</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-full bg-slate-900 flex items-center justify-center p-4">
-        <div className="text-center space-y-4">
-          <p className="text-red-400 text-sm">{error}</p>
-          <button
-            onClick={() => loadPuzzle(difficulty)}
-            className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl px-6 py-3 transition-colors"
-          >
-            Try Again
-          </button>
+      <div className="screen" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="bg-orbs"><div className="orb a" /><div className="orb b" /><div className="orb c" /></div>
+        <div className="bg-grid" />
+        <div style={{ textAlign: 'center' }}>
+          <p style={{ color: 'oklch(0.7 0.22 25)', marginBottom: 16 }}>{error}</p>
+          <button className="btn btn-primary" onClick={() => loadPuzzle(difficulty)}>Try again</button>
         </div>
       </div>
     );
@@ -166,116 +139,116 @@ export default function Solo() {
 
   if (completed) {
     return (
-      <div className="min-h-full bg-slate-900 flex items-center justify-center p-4">
-        <div className="w-full max-w-sm space-y-4">
-          <div className="bg-green-950 border border-green-700 rounded-2xl p-8 text-center shadow-xl">
-            <div className="text-6xl mb-4">🎉</div>
-            <h1 className="text-3xl font-bold text-green-400 mb-1">
+      <div className="screen">
+        <div className="bg-orbs"><div className="orb a" /><div className="orb b" /><div className="orb c" /></div>
+        <div className="bg-grid" />
+        <div className="modal-backdrop">
+          <div className="victory-card card" style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 52 }}>🎉</div>
+            <h2 style={{ color: 'oklch(0.92 0.14 80)' }}>
               {nickname ? `Well done, ${nickname}!` : 'Puzzle Solved!'}
-            </h1>
-            <p className="text-slate-400 text-sm mb-6 capitalize">{difficulty} difficulty</p>
-            <div className="bg-slate-800/50 rounded-xl px-4 py-4">
-              <p className="text-slate-500 text-xs uppercase tracking-widest mb-1">Time</p>
-              <p className="text-4xl font-mono font-bold text-white">{formatDuration(finalTime)}</p>
-            </div>
-          </div>
+            </h2>
+            <p className="sub" style={{ textTransform: 'capitalize' }}>{difficulty} · Solo</p>
 
-          <button
-            onClick={handlePlayAgain}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl py-3.5 transition-colors"
-          >
-            Play Again
-          </button>
-
-          <div className="grid grid-cols-3 gap-2">
-            {DIFFICULTIES.map(d => (
-              <button
-                key={d}
-                onClick={() => handleChangeDifficulty(d)}
-                className={`py-2.5 rounded-xl font-medium capitalize text-sm transition-colors ${
-                  d === difficulty
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                }`}
-              >
-                {d}
-              </button>
-            ))}
-          </div>
-
-          <button
-            onClick={() => navigate('/')}
-            className="w-full bg-slate-700 hover:bg-slate-600 text-slate-300 font-semibold rounded-xl py-3 transition-colors"
-          >
-            Home
-          </button>
-
-          {history.length > 0 && (
-            <div className="bg-slate-800 rounded-2xl p-4">
-              <p className="text-slate-400 text-xs uppercase tracking-widest mb-3">Your Records</p>
-              <div className="space-y-1 max-h-48 overflow-y-auto">
-                {history.map((r, i) => (
-                  <div key={i} className="flex items-center justify-between text-sm px-1 py-1.5 border-b border-slate-700/50 last:border-0">
-                    <span className="text-slate-500 w-6">#{i + 1}</span>
-                    <span className="text-slate-300 capitalize flex-1">{r.difficulty}</span>
-                    <span className="font-mono text-white">{formatDuration(r.time)}</span>
-                    <span className="text-slate-500 text-xs ml-3 w-14 text-right">
-                      {new Date(r.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                    </span>
-                  </div>
-                ))}
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--stroke)', borderRadius: 16, padding: '20px 32px', margin: '0 0 24px', display: 'inline-block' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 6 }}>Your time</div>
+              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 40, fontWeight: 700, letterSpacing: '-0.02em', color: 'oklch(0.92 0.14 80)' }}>
+                {formatDuration(finalTime)}
               </div>
             </div>
-          )}
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 20 }}>
+              <button className="btn btn-secondary" onClick={() => navigate('/')}>Home</button>
+              <button className="btn btn-primary" onClick={() => loadPuzzle(difficulty)}>Play again →</button>
+            </div>
+
+            <div className="diff-row">
+              {DIFFICULTIES.map(d => (
+                <div
+                  key={d}
+                  className={`diff-opt${difficulty === d ? ' active' : ''}`}
+                  onClick={() => { setDifficulty(d); loadPuzzle(d); }}
+                >
+                  {d.charAt(0).toUpperCase() + d.slice(1)}
+                  <small>{d === 'easy' ? '~3 min' : d === 'medium' ? '~5 min' : '~9 min'}</small>
+                </div>
+              ))}
+            </div>
+
+            {history.length > 0 && (
+              <div style={{ marginTop: 20, textAlign: 'left' }}>
+                <div style={{ fontSize: 11, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 10 }}>
+                  Your records
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 160, overflowY: 'auto' }}>
+                  {history.slice(0, 8).map((r, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, padding: '6px 0', borderBottom: '1px solid var(--stroke)' }}>
+                      <span style={{ color: 'var(--text-faint)', width: 20, textAlign: 'center' }}>#{i + 1}</span>
+                      <span style={{ color: 'var(--text-dim)', textTransform: 'capitalize', flex: 1 }}>{r.difficulty}</span>
+                      <span style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 700 }}>{formatDuration(r.time)}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>
+                        {new Date(r.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-full bg-slate-900 text-white flex flex-col">
-      <div className="flex flex-col items-center gap-4 p-4 pb-6 w-full max-w-lg mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between w-full">
-          <button
-            onClick={() => navigate('/')}
-            className="text-slate-500 hover:text-slate-300 text-sm transition-colors"
-          >
-            ← Home
-          </button>
-          <h1 className="text-lg font-bold text-slate-200">Solo</h1>
-          <span className="font-mono text-slate-300 text-lg tabular-nums">
+    <div className="screen">
+      <div className="bg-orbs"><div className="orb a" /><div className="orb b" /><div className="orb c" /></div>
+      <div className="bg-grid" />
+
+      <div className="topbar">
+        <Logo />
+        <div className="topbar-actions">
+          <span className="diff-chip" style={{ fontSize: 11 }}>{difficulty}</span>
+          <div className="timer-pill" style={{ fontSize: 14, padding: '6px 14px' }}>
+            <span className="dot" />
             {formatDuration(displayElapsed)}
+          </div>
+          <button className="btn-ghost" style={{ padding: '8px 14px' }} onClick={() => navigate('/')}>← Home</button>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18, padding: '20px 24px 40px', position: 'relative', zIndex: 1 }}>
+        {/* Progress */}
+        <div style={{ width: '100%', maxWidth: 580, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ flex: 1, height: 6, background: 'rgba(0,0,0,0.3)', borderRadius: 3, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${progress}%`, background: 'var(--p1)', borderRadius: 3, transition: 'width 0.4s ease' }} />
+          </div>
+          <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: 'var(--text-dim)', minWidth: 36 }}>
+            {progress}%
           </span>
         </div>
 
-        {/* Progress + difficulty */}
-        <div className="w-full flex items-center justify-between">
-          <div className="flex-1 bg-slate-700 rounded-full h-2 mr-3">
-            <div
-              className="bg-indigo-500 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          <span className="text-slate-400 text-xs capitalize flex-shrink-0">{difficulty}</span>
-        </div>
-
-        {/* Board */}
         <SudokuBoard
           board={board}
           puzzle={puzzle}
+          solution={solution}
           onCellChange={handleCellChange}
           disabled={completed}
           selectedCell={selectedCell}
           onSelectCell={setSelectedCell}
         />
 
-        {/* Number pad */}
         <NumberPad
           onNumber={handleNumberPad}
           onClear={handleClear}
           disabled={completed || selectedCell === null}
+          notesMode={notesMode}
+          onToggleNotes={() => setNotesMode(n => !n)}
         />
+
+        <p style={{ fontSize: 12, color: 'var(--text-faint)', fontFamily: 'JetBrains Mono, monospace' }}>
+          ← → ↑ ↓ navigate · 1–9 fill · Backspace erase
+        </p>
       </div>
     </div>
   );

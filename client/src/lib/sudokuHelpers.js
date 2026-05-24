@@ -16,6 +16,14 @@ export function formatDuration(seconds) {
   return `${m}:${s}`;
 }
 
+export function toMilestone(progress) {
+  if (progress >= 100) return 100;
+  if (progress >= 75) return 75;
+  if (progress >= 50) return 50;
+  if (progress >= 25) return 25;
+  return 0;
+}
+
 export function calcClientProgress(board, puzzle, solution) {
   const blanks = puzzle.filter(v => v === 0).length;
   if (blanks === 0) return 100;

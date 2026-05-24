@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Sudoku Battle is a real-time multiplayer Sudoku app. Two players compete in the same room, each solving the same puzzle independently. The first to complete it wins. There's also a solo mode with a local game history.
+Sudoku Battle is a real-time multiplayer Sudoku app. Multiple players compete in the same room, each solving the same puzzle independently. The first to complete it wins. There's also a solo mode with a local game history.
 
-The app is a PWA (installable) built with React + Vite on the frontend, and an Express + Socket.IO server on the backend. No database — all room/game state lives in memory on the server.
+The app is a PWA (installable) built with React + Vite on the frontend, and an Express + Socket.IO server on the backend. Live room/game state lives in memory on the server. Supabase is used optionally for auth and persisting game history — both client and server gracefully degrade when Supabase env vars are absent.
 
 ## Testing & Linting
 
@@ -34,10 +34,14 @@ npm start        # Production start
 
 **`client/.env`** (copy from `.env.example`):
 - `VITE_SOCKET_URL` — URL of the backend server (default: `http://localhost:3001`)
+- `VITE_SUPABASE_URL` — Supabase project URL (optional; auth disabled if absent)
+- `VITE_SUPABASE_ANON_KEY` — Supabase anon key (optional)
 
 **`server/.env`** (copy from `.env.example`):
 - `PORT` — HTTP/Socket.IO port (default: `3001`)
 - `CLIENT_URL` — allowed CORS origin (default: `http://localhost:5173`)
+- `SUPABASE_URL` — Supabase project URL (optional; game history saving disabled if absent)
+- `SUPABASE_SERVICE_ROLE_KEY` — Supabase service role key (optional; **never commit**)
 
 ## Architecture
 
@@ -45,16 +49,19 @@ npm start        # Production start
 
 - **`main.jsx`** → **`App.jsx`**: Sets up `SocketProvider` (single shared socket instance) and React Router routes.
 - **`context/SocketContext.jsx`**: Creates one `socket.io-client` instance for the entire app. All pages consume it via `useSocket()`.
-- **`lib/sudokuHelpers.js`**: Pure helpers shared between multiplayer and solo — `isCellGiven`, `isCellCorrect`, `isCellWrong`, `calcClientProgress`, `formatDuration`.
-- **`components/`**: Shared UI — `SudokuBoard`, `SudokuCell`, `NumberPad` (input), `PlayerStatus` (nickname + progress bar), `ProgressBar`, `Timer`.
+- **`lib/sudokuHelpers.js`**: Pure helpers shared between multiplayer and solo — `isCellGiven`, `calcClientProgress`, `formatDuration`, `toMilestone` (snaps 0–100 to 0/25/50/75/100).
+- **`lib/supabase.js`**: Supabase client (returns `null` when env vars are absent).
+- **`lib/api.js`**: `saveGame()` — posts completed game data to the server, which writes to Supabase.
+- **`components/`**: Shared UI — `SudokuBoard`, `SudokuCell`, `NumberPad`, `Timer`, `PlayerStatus`, `PlayerProgressStrip`, `ProgressBar`.
 
 **Pages and their roles:**
-- `Home` — entry point; lets user set a nickname, choose to create/join a room or play solo
-- `Room` — waiting lobby after creating a room; shows the 6-char room code and waits for `opponent-joined`
-- `Game` — live multiplayer game; receives `opponent-progress` events and emits `cell-update`
-- `Result` — post-game screen; shown after `game-over` or `opponent-disconnected`
-- `Solo` — single-player mode; fetches a puzzle from `GET /api/rooms/puzzle`, tracks progress locally with `localStorage` history
-- `History` — displays solo game history from `localStorage`
+- `Home` — entry point; nickname input, create/join room, solo play, leaderboard link
+- `Room` — waiting lobby; shows 6-char room code, host can start when ≥2 players join; listens for `game-started` / `room-closed`
+- `Game` — live multiplayer game; emits `cell-update`, receives `players-progress` (milestone-snapped to 0/25/50/75/100), `player-left`, `game-over`, `emote`
+- `Result` — post-game podium with confetti for winner; saves game to localStorage + Supabase
+- `Solo` — single-player; fetches puzzle from `GET /api/rooms/puzzle`, progress bar, saves to localStorage + Supabase on completion
+- `History` — solo and battle history; reads localStorage, syncs from Supabase for logged-in users
+- `Leaderboard` — global rankings fetched from `GET /api/games/leaderboard`; Most Wins and Best Times tabs
 
 **State flow across pages** — game data (puzzle, solution, difficulty, nickname, opponentNickname) is passed via React Router `location.state` when navigating between Room → Game → Result. If `location.state` is missing the required puzzle data, pages redirect to `/`.
 
@@ -70,17 +77,21 @@ npm start        # Production start
 
 | Event (client→server) | Payload | Callback |
 |---|---|---|
-| `create-room` | `{ nickname, difficulty }` | `{ ok, roomId, puzzle, solution, difficulty }` |
-| `join-room` | `{ roomId, nickname }` | `{ ok, roomId, puzzle, solution, difficulty, opponentNickname }` |
+| `create-room` | `{ nickname, difficulty }` | `{ ok, roomId }` |
+| `join-room` | `{ roomId, nickname }` | `{ ok, roomId, players }` |
+| `start-game` | `{ roomId }` | `{ ok }` (host only) |
 | `cell-update` | `{ roomId, index, value }` | — |
 | `leave-game` | `{ roomId }` | — |
+| `emote` | `{ roomId, emote }` | — |
 
 | Event (server→client) | Payload |
 |---|---|
-| `opponent-joined` | `{ opponentNickname, puzzle, solution, difficulty }` |
-| `opponent-progress` | `{ progress }` (0–100, snapped to milestones 0/25/50/75/100 on client) |
-| `game-over` | `{ winnerSocketId, winnerNickname, loserNickname, loserProgress, duration }` |
-| `opponent-disconnected` | — |
+| `game-started` | `{ puzzle, solution, difficulty, players, startedAt }` |
+| `players-progress` | `{ updates: [{ socketId, progress }] }` — raw 0–100; client snaps to milestones |
+| `player-left` | `{ socketId, nickname, remainingPlayers, autoWin }` |
+| `game-over` | `{ leaderboard, winnerSocketId, winnerNickname, difficulty, totalDuration }` |
+| `room-closed` | `{ reason }` |
+| `emote` | `{ socketId, emote }` |
 
 ### Board Representation
 

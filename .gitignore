@@ -8,3 +8,4 @@ mempalace.yaml
 .venv
 .claude
 graphify-out
+.vercel/

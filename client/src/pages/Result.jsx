@@ -1,9 +1,40 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
 import { saveGame } from '../lib/api';
 import { formatDuration } from '../lib/sudokuHelpers';
+import { avatarGradient, getPlayerPaletteId, initials } from '../lib/players';
+
+const CONFETTI_COLORS = [
+  'oklch(0.82 0.16 80)',
+  'oklch(0.72 0.18 285)',
+  'oklch(0.78 0.16 200)',
+  'oklch(0.74 0.18 25)',
+  'oklch(0.78 0.18 150)',
+  'oklch(0.78 0.16 330)',
+];
+
+function Confetti() {
+  const pieces = Array.from({ length: 36 }, (_, i) => ({
+    id: i,
+    left: `${(i / 36) * 100 + Math.random() * 4}%`,
+    delay: `${(Math.random() * 1.5).toFixed(2)}s`,
+    color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+    rotate: `${Math.random() * 360}deg`,
+  }));
+  return (
+    <>
+      {pieces.map(p => (
+        <div
+          key={p.id}
+          className="confetti-piece"
+          style={{ left: p.left, animationDelay: p.delay, background: p.color, transform: `rotate(${p.rotate})` }}
+        />
+      ))}
+    </>
+  );
+}
 
 export default function Result() {
   const location = useLocation();
@@ -11,22 +42,14 @@ export default function Result() {
   const socket = useSocket();
   const state = location.state;
 
-  if (!state) {
-    navigate('/');
-    return null;
-  }
+  if (!state) { navigate('/'); return null; }
 
   const { leaderboard = [], winnerSocketId, winnerNickname, totalDuration, autoWin } = state;
   const mySocketId = state.mySocketId ?? socket.id;
-  const isWinner = winnerSocketId === mySocketId;
+  const isWinner = autoWin || winnerSocketId === mySocketId;
   const myEntry = leaderboard.find(e => e.socketId === mySocketId);
   const myRank = myEntry?.rank ?? null;
-
   const { session } = useAuth();
-
-  const [history, setHistory] = useState(() =>
-    JSON.parse(localStorage.getItem('sudoku-battle-history') || '[]')
-  );
 
   useEffect(() => {
     const record = {
@@ -40,132 +63,89 @@ export default function Result() {
       date: new Date().toISOString(),
     };
     const prev = JSON.parse(localStorage.getItem('sudoku-battle-history') || '[]');
-    const updated = [record, ...prev].slice(0, 20);
-    localStorage.setItem('sudoku-battle-history', JSON.stringify(updated));
-    setHistory(updated);
+    localStorage.setItem('sudoku-battle-history', JSON.stringify([record, ...prev].slice(0, 20)));
 
     if (session?.access_token) {
-      saveGame(
-        {
-          mode: 'battle',
-          difficulty: state.difficulty || 'medium',
-          playerCount: leaderboard.length,
-          winnerNickname: winnerNickname ?? null,
-          totalDuration: totalDuration ?? null,
-          players: leaderboard.map(entry => ({
-            isMe: entry.socketId === mySocketId,
-            nickname: entry.nickname,
-            outcome: entry.socketId === winnerSocketId ? 'win' : 'loss',
-            rank: entry.rank,
-            progress: entry.progress,
-            duration: entry.duration ?? null,
-          })),
-        },
-        session.access_token
-      );
+      saveGame({
+        mode: 'battle',
+        difficulty: state.difficulty || 'medium',
+        playerCount: leaderboard.length,
+        winnerNickname: winnerNickname ?? null,
+        totalDuration: totalDuration ?? null,
+        players: leaderboard.map(entry => ({
+          isMe: entry.socketId === mySocketId,
+          nickname: entry.nickname,
+          outcome: entry.socketId === winnerSocketId ? 'win' : 'loss',
+          rank: entry.rank,
+          progress: entry.progress,
+          duration: entry.duration ?? null,
+        })),
+      }, session.access_token);
     }
   }, []);
 
-  const headerEmoji = autoWin ? '🏆' : isWinner ? '🏆' : '💪';
-  const headerText = autoWin
-    ? 'All opponents left — you win!'
-    : isWinner
-    ? 'You won!'
-    : `${winnerNickname} won!`;
+  const sorted = [...leaderboard].sort((a, b) => a.rank - b.rank);
+
+  // Podium visual order: 2nd | 1st | 3rd
+  const podiumSlots = [sorted[1], sorted[0], sorted[2]];
+  const podiumClasses = ['second', 'first', 'third'];
+  const podiumMedals = ['🥈', '🥇', '🥉'];
 
   return (
-    <div className="min-h-full bg-slate-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm space-y-4">
-        {/* Result card */}
-        <div
-          className={`rounded-2xl p-6 shadow-xl ${
-            isWinner || autoWin
-              ? 'bg-green-950 border border-green-700'
-              : 'bg-slate-800 border border-slate-600'
-          }`}
-        >
-          <div className="text-center mb-4">
-            <div className="text-5xl mb-3">{headerEmoji}</div>
-            <h1 className={`text-2xl font-bold ${isWinner || autoWin ? 'text-green-400' : 'text-slate-100'}`}>
-              {headerText}
-            </h1>
-            {totalDuration != null && !autoWin && (
-              <p className="text-slate-400 text-sm mt-1">
-                Winner's time: <span className="font-mono font-bold text-white">{formatDuration(totalDuration)}</span>
-              </p>
-            )}
-          </div>
+    <div className="screen">
+      <div className="bg-orbs"><div className="orb a" /><div className="orb b" /><div className="orb c" /></div>
+      <div className="bg-grid" />
 
-          {/* Leaderboard */}
-          <div className="space-y-1.5">
-            {leaderboard.map((entry) => {
-              const isMe = entry.socketId === mySocketId;
-              const isFirst = entry.rank === 1;
-              return (
-                <div
-                  key={entry.socketId}
-                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${
-                    isMe
-                      ? 'bg-indigo-900/60 border border-indigo-700'
-                      : 'bg-slate-800/60'
-                  }`}
-                >
-                  <span
-                    className={`font-bold w-6 text-center flex-shrink-0 ${
-                      isFirst ? 'text-yellow-400' : 'text-slate-500'
-                    }`}
-                  >
-                    #{entry.rank}
-                  </span>
-                  <span className="text-slate-200 truncate flex-1">
-                    {entry.nickname}
-                    {isMe && <span className="text-slate-500 ml-1">(you)</span>}
-                  </span>
-                  <span className={`font-bold tabular-nums flex-shrink-0 ${isFirst ? 'text-yellow-400' : 'text-slate-300'}`}>
-                    {entry.progress}%
-                  </span>
-                  <span className="font-mono text-slate-500 text-xs flex-shrink-0 w-12 text-right">
-                    {entry.duration != null ? formatDuration(entry.duration) : '—'}
-                  </span>
-                </div>
-              );
-            })}
+      <div className="modal-backdrop">
+        <div className="victory-card card" style={{ position: 'relative', overflow: 'hidden' }}>
+          {isWinner && <Confetti />}
+
+          <div style={{ fontSize: 52 }}>{isWinner ? '🏆' : '💪'}</div>
+          <h2 style={{ color: isWinner ? 'oklch(0.92 0.14 80)' : 'var(--text)' }}>
+            {autoWin ? 'All opponents left — you win!' : isWinner ? 'You won!' : `${winnerNickname} won!`}
+          </h2>
+          {totalDuration != null && !autoWin && (
+            <p className="sub">
+              Winner's time:{' '}
+              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, color: 'var(--text)' }}>
+                {formatDuration(totalDuration)}
+              </span>
+            </p>
+          )}
+
+          {sorted.length > 0 && (
+            <div className="podium">
+              {podiumSlots.map((entry, vi) => {
+                if (!entry) return <div key={`empty-${vi}`} />;
+                const idx = leaderboard.findIndex(e => e.socketId === entry.socketId);
+                const pid = entry.socketId === mySocketId && state.avatarId
+                  ? state.avatarId
+                  : getPlayerPaletteId(idx);
+                const isMe = entry.socketId === mySocketId;
+                return (
+                  <div key={entry.socketId} className={`podium-spot ${podiumClasses[vi]}`}>
+                    <div
+                      className="opp-mini-avatar"
+                      style={{ background: avatarGradient(pid), width: 38, height: 38, fontSize: 14, borderRadius: 11 }}
+                    >
+                      {initials(entry.nickname)}
+                    </div>
+                    <div className="podium-rank">{podiumMedals[vi]}</div>
+                    <div className="podium-name">{isMe ? 'You' : entry.nickname}</div>
+                    <div className="podium-time">
+                      {entry.duration != null ? formatDuration(entry.duration) : `${entry.progress ?? 0}%`}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <button className="btn btn-secondary" onClick={() => navigate('/')}>Home</button>
+            <button className="btn btn-primary" onClick={() => navigate('/')}>Play again →</button>
           </div>
         </div>
-
-        {/* Play again */}
-        <button
-          onClick={() => navigate('/')}
-          className="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold rounded-xl py-3.5 transition-colors"
-        >
-          Play Again
-        </button>
-
-        {/* Battle history */}
-        {history.length > 0 && (
-          <div className="bg-slate-800 rounded-2xl p-4">
-            <p className="text-slate-400 text-xs uppercase tracking-widest mb-3">Battle History</p>
-            <div className="space-y-1 max-h-48 overflow-y-auto">
-              {history.map((r, i) => (
-                <div key={i} className="flex items-center gap-2 text-sm px-1 py-1.5 border-b border-slate-700/50 last:border-0">
-                  <span className={`text-xs font-bold w-5 ${r.outcome === 'win' ? 'text-green-400' : 'text-red-400'}`}>
-                    {r.outcome === 'win' ? 'W' : 'L'}
-                  </span>
-                  <span className="text-slate-300 capitalize w-12">{r.difficulty}</span>
-                  <span className="text-slate-400 flex-1 truncate text-xs">
-                    #{r.myRank ?? '?'}/{r.playerCount ?? '?'} · {r.winnerNickname ? `${r.winnerNickname} won` : ''}
-                  </span>
-                  <span className="font-mono text-white text-xs">
-                    {r.duration != null ? formatDuration(r.duration) : '—'}
-                  </span>
-                  <span className="text-slate-500 text-xs w-14 text-right">
-                    {new Date(r.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
