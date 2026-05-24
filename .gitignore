@@ -3,3 +3,8 @@ dist/
 .env
 .env.local
 .env*.local
+entities.json
+mempalace.yaml
+.venv
+.claude
+graphify-out

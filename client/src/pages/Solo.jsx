@@ -3,6 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import SudokuBoard from '../components/SudokuBoard';
 import NumberPad from '../components/NumberPad';
 import { calcClientProgress, isCellGiven, formatDuration } from '../lib/sudokuHelpers';
+import { useAuth } from '../context/AuthContext';
+import { saveGame } from '../lib/api';
 
 const API_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
 const DIFFICULTIES = ['easy', 'medium', 'hard'];
@@ -18,6 +20,7 @@ function toMilestone(progress) {
 export default function Solo() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { session } = useAuth();
   const nickname = location.state?.nickname || '';
 
   const [difficulty, setDifficulty] = useState(location.state?.difficulty || 'medium');
@@ -92,6 +95,27 @@ export default function Solo() {
         const updated = [record, ...prev].slice(0, 20);
         localStorage.setItem('sudoku-solo-history', JSON.stringify(updated));
         setHistory(updated);
+
+        if (session?.access_token) {
+          saveGame(
+            {
+              mode: 'solo',
+              difficulty,
+              playerCount: 1,
+              winnerNickname: nickname || 'Player',
+              totalDuration: t,
+              players: [{
+                isMe: true,
+                nickname: nickname || 'Player',
+                outcome: 'completed',
+                rank: 1,
+                progress: 100,
+                duration: t,
+              }],
+            },
+            session.access_token
+          );
+        }
       }
       return next;
     });

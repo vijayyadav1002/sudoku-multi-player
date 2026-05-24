@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
+import { useAuth } from '../context/AuthContext';
+import { saveGame } from '../lib/api';
 import { formatDuration } from '../lib/sudokuHelpers';
 
 export default function Result() {
@@ -19,6 +21,8 @@ export default function Result() {
   const isWinner = winnerSocketId === mySocketId;
   const myEntry = leaderboard.find(e => e.socketId === mySocketId);
   const myRank = myEntry?.rank ?? null;
+
+  const { session } = useAuth();
 
   const [history, setHistory] = useState(() =>
     JSON.parse(localStorage.getItem('sudoku-battle-history') || '[]')
@@ -39,6 +43,27 @@ export default function Result() {
     const updated = [record, ...prev].slice(0, 20);
     localStorage.setItem('sudoku-battle-history', JSON.stringify(updated));
     setHistory(updated);
+
+    if (session?.access_token) {
+      saveGame(
+        {
+          mode: 'battle',
+          difficulty: state.difficulty || 'medium',
+          playerCount: leaderboard.length,
+          winnerNickname: winnerNickname ?? null,
+          totalDuration: totalDuration ?? null,
+          players: leaderboard.map(entry => ({
+            isMe: entry.socketId === mySocketId,
+            nickname: entry.nickname,
+            outcome: entry.socketId === winnerSocketId ? 'win' : 'loss',
+            rank: entry.rank,
+            progress: entry.progress,
+            duration: entry.duration ?? null,
+          })),
+        },
+        session.access_token
+      );
+    }
   }, []);
 
   const headerEmoji = autoWin ? '🏆' : isWinner ? '🏆' : '💪';

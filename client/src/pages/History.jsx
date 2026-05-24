@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatDuration } from '../lib/sudokuHelpers';
+import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 
-function readHistory(key) {
+function readLocalHistory(key) {
   try {
     return JSON.parse(localStorage.getItem(key) || '[]');
   } catch {
@@ -12,12 +14,53 @@ function readHistory(key) {
 
 export default function History() {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
-  const [soloHistory] = useState(() => readHistory('sudoku-solo-history'));
-  const [battleHistory] = useState(() => readHistory('sudoku-battle-history'));
+  const [soloHistory, setSoloHistory] = useState(() => readLocalHistory('sudoku-solo-history'));
+  const [battleHistory, setBattleHistory] = useState(() => readLocalHistory('sudoku-battle-history'));
   const [activeTab, setActiveTab] = useState(() =>
     soloHistory.length > 0 ? 'solo' : 'battles'
   );
+  const [dbLoading, setDbLoading] = useState(false);
+
+  useEffect(() => {
+    if (!user || !supabase) return;
+    setDbLoading(true);
+
+    supabase
+      .from('game_players')
+      .select(`outcome, rank, progress, duration_seconds, games(mode, difficulty, winner_nickname, player_count, total_duration_seconds, played_at)`)
+      .order('created_at', { ascending: false })
+      .limit(50)
+      .then(({ data }) => {
+        if (!data) return;
+
+        const solo = data
+          .filter(r => r.games?.mode === 'solo')
+          .map(r => ({
+            difficulty: r.games.difficulty,
+            time: r.duration_seconds,
+            date: r.games.played_at,
+          }));
+
+        const battles = data
+          .filter(r => r.games?.mode === 'battle')
+          .map(r => ({
+            outcome: r.outcome,
+            winnerNickname: r.games.winner_nickname ?? '',
+            difficulty: r.games.difficulty,
+            duration: r.games.total_duration_seconds,
+            playerCount: r.games.player_count,
+            myRank: r.rank,
+            myProgress: r.progress,
+            date: r.games.played_at,
+          }));
+
+        if (solo.length > 0) setSoloHistory(solo);
+        if (battles.length > 0) setBattleHistory(battles);
+      })
+      .finally(() => setDbLoading(false));
+  }, [user]);
 
   return (
     <div className="min-h-full bg-slate-900 text-white flex flex-col">
@@ -30,7 +73,9 @@ export default function History() {
           >
             ← Back
           </button>
-          <h1 className="text-lg font-bold text-slate-200">Play History</h1>
+          <h1 className="text-lg font-bold text-slate-200">
+          Play History{dbLoading && <span className="text-slate-500 text-sm font-normal ml-2">syncing…</span>}
+        </h1>
           <div className="w-12" />
         </div>
 
