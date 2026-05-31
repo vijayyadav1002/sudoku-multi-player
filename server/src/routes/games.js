@@ -75,4 +75,33 @@ router.get('/leaderboard', async (_req, res) => {
   res.json({ wins: winsRes.data, times: timesRes.data });
 });
 
+router.get('/stats', async (_req, res) => {
+  if (!supabase) return res.json({ matchesToday: null, avgSolveTime: null });
+
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  const [countRes, timesRes] = await Promise.all([
+    supabase
+      .from('games')
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', todayStart.toISOString()),
+    supabase
+      .from('game_players')
+      .select('duration_seconds')
+      .eq('progress', 100)
+      .not('duration_seconds', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(500),
+  ]);
+
+  const matchesToday = countRes.count ?? null;
+  const times = timesRes.data?.map(r => r.duration_seconds) ?? [];
+  const avgSolveTime = times.length
+    ? Math.round(times.reduce((a, b) => a + b, 0) / times.length)
+    : null;
+
+  res.json({ matchesToday, avgSolveTime });
+});
+
 export default router;

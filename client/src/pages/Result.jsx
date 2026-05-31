@@ -65,7 +65,7 @@ export default function Result() {
     const prev = JSON.parse(localStorage.getItem('sudoku-battle-history') || '[]');
     localStorage.setItem('sudoku-battle-history', JSON.stringify([record, ...prev].slice(0, 20)));
 
-    if (session?.access_token) {
+    if (session?.access_token && !autoWin) {
       saveGame({
         mode: 'battle',
         difficulty: state.difficulty || 'medium',

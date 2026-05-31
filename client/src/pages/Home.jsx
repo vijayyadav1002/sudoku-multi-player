@@ -3,6 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
 import { PLAYER_PALETTE, avatarGradient } from '../lib/players';
+import { formatDuration } from '../lib/sudokuHelpers';
+
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+
+function fmtCount(n) {
+  if (n == null) return '—';
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return String(n);
+}
+
+function fmtTime(seconds) {
+  if (seconds == null) return '—';
+  return formatDuration(seconds);
+}
 
 const DIFFICULTIES = ['easy', 'medium', 'hard'];
 
@@ -35,6 +49,9 @@ export default function Home() {
   const [isPublic, setIsPublic] = useState(false);
   const [publicRooms, setPublicRooms] = useState([]);
   const [roomsLoading, setRoomsLoading] = useState(true);
+  const [onlineCount, setOnlineCount] = useState(null);
+  const [matchesToday, setMatchesToday] = useState(null);
+  const [avgSolveTime, setAvgSolveTime] = useState(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -56,11 +73,24 @@ export default function Home() {
       setRoomsLoading(false);
     }
     socket.on('public-rooms-updated', handleRoomsUpdated);
+    socket.on('online-count', setOnlineCount);
     return () => {
       socket.emit('leave-lobby');
       socket.off('public-rooms-updated', handleRoomsUpdated);
+      socket.off('online-count', setOnlineCount);
     };
   }, [socket]);
+
+  useEffect(() => {
+    fetch(`${SOCKET_URL}/api/games/stats`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data) return;
+        setMatchesToday(data.matchesToday);
+        setAvgSolveTime(data.avgSolveTime);
+      })
+      .catch(() => {});
+  }, []);
 
   function saveAvatar(id) {
     setAvatarId(id);
@@ -120,7 +150,7 @@ export default function Home() {
       <div className="topbar">
         <Logo />
         <div className="topbar-actions">
-          <div className="pill"><span className="dot-live" /> 2,184 online</div>
+          <div className="pill"><span className="dot-live" /> {fmtCount(onlineCount)} online</div>
           <button className="btn-ghost" style={{ padding: '8px 14px' }} onClick={() => navigate('/leaderboard')}>
             🏆 Leaderboard
           </button>
@@ -158,9 +188,9 @@ export default function Home() {
             Up to ten players, same puzzle, live progress. First to finish wins.
           </p>
           <div className="hero-stats">
-            <div className="hero-stat"><div className="num">2.1k</div><div className="lbl">online now</div></div>
-            <div className="hero-stat"><div className="num">187k</div><div className="lbl">matches today</div></div>
-            <div className="hero-stat"><div className="num">04:12</div><div className="lbl">avg solve</div></div>
+            <div className="hero-stat"><div className="num">{fmtCount(onlineCount)}</div><div className="lbl">online now</div></div>
+            <div className="hero-stat"><div className="num">{fmtCount(matchesToday)}</div><div className="lbl">matches today</div></div>
+            <div className="hero-stat"><div className="num">{fmtTime(avgSolveTime)}</div><div className="lbl">avg solve</div></div>
           </div>
         </div>
 

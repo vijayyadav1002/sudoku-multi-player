@@ -21,6 +21,10 @@ app.use('/api/rooms', roomsRouter);
 app.use('/api/games', gamesRouter);
 
 io.on('connection', (socket) => {
+  io.emit('online-count', io.engine.clientsCount);
+  socket.on('disconnect', () => {
+    io.emit('online-count', io.engine.clientsCount);
+  });
   registerGameHandlers(io, socket);
 });
 
