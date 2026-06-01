@@ -48,6 +48,8 @@ export function addPlayer(roomId, socketId, nickname) {
   const room = rooms.get(roomId);
   if (!room) return null;
   if (room.players.length >= MAX_PLAYERS) return null;
+  const existing = room.players.find(p => p.socketId === socketId);
+  if (existing) return existing;
   const player = {
     socketId,
     nickname,
@@ -58,6 +60,21 @@ export function addPlayer(roomId, socketId, nickname) {
   };
   room.players.push(player);
   return player;
+}
+
+export function updateRoomDifficulty(roomId, difficulty, puzzle, solution) {
+  const room = rooms.get(roomId);
+  if (!room || room.status !== 'waiting') return null;
+  room.difficulty = difficulty;
+  room.puzzle = [...puzzle];
+  room.solution = [...solution];
+  room.players.forEach((player) => {
+    player.board = [...puzzle];
+    player.progress = 0;
+    player.completed = false;
+    player.completedAt = null;
+  });
+  return room;
 }
 
 export function removePlayer(roomId, socketId) {

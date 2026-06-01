@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
@@ -41,17 +41,29 @@ export default function Result() {
   const navigate = useNavigate();
   const socket = useSocket();
   const state = location.state;
+  const { session } = useAuth();
+  const savedRef = useRef(false);
 
-  if (!state) { navigate('/'); return null; }
+  useEffect(() => {
+    if (!state) navigate('/');
+  }, [navigate, state]);
 
-  const { leaderboard = [], winnerSocketId, winnerNickname, totalDuration, autoWin } = state;
-  const mySocketId = state.mySocketId ?? socket.id;
+  const {
+    leaderboard = [],
+    winnerSocketId,
+    winnerNickname,
+    totalDuration,
+    autoWin,
+  } = state ?? {};
+
+  const mySocketId = state?.mySocketId ?? socket.id;
   const isWinner = autoWin || winnerSocketId === mySocketId;
   const myEntry = leaderboard.find(e => e.socketId === mySocketId);
   const myRank = myEntry?.rank ?? null;
-  const { session } = useAuth();
 
   useEffect(() => {
+    if (!state || savedRef.current) return;
+    savedRef.current = true;
     const record = {
       outcome: isWinner ? 'win' : 'loss',
       winnerNickname: winnerNickname ?? '',
@@ -82,7 +94,9 @@ export default function Result() {
         })),
       }, session.access_token);
     }
-  }, []);
+  }, [autoWin, isWinner, leaderboard, myEntry, myRank, mySocketId, session, state, totalDuration, winnerNickname, winnerSocketId]);
+
+  if (!state) return null;
 
   const sorted = [...leaderboard].sort((a, b) => a.rank - b.rank);
 

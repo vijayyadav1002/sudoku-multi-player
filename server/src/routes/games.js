@@ -58,7 +58,7 @@ router.post('/', async (req, res) => {
 });
 
 router.get('/leaderboard', async (_req, res) => {
-  if (!supabase) return res.status(503).json({ error: 'DB not configured' });
+  if (!supabase) return res.json({ wins: [], times: [] });
 
   const [winsRes, timesRes] = await Promise.all([
     // Top 10 by battle wins

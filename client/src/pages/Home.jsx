@@ -160,10 +160,9 @@ export default function Home() {
           {authEnabled && (
             user ? (
               <div className="pill" style={{ paddingLeft: 6, gap: 8, cursor: 'pointer' }} onClick={signOut}>
-                {user.user_metadata?.avatar_url
-                  ? <img src={user.user_metadata.avatar_url} className="opp-mini-avatar" style={{ width: 22, height: 22, borderRadius: 6 }} />
-                  : <div className="opp-mini-avatar" style={{ background: avatarGradient(avatarId), width: 22, height: 22, fontSize: 10, borderRadius: 6 }}>{(user.user_metadata?.full_name || 'U').slice(0,2).toUpperCase()}</div>
-                }
+                <div className="opp-mini-avatar" style={{ background: avatarGradient(avatarId), width: 22, height: 22, fontSize: 10, borderRadius: 6 }}>
+                  {(user.user_metadata?.full_name || 'U').slice(0, 2).toUpperCase()}
+                </div>
                 <span style={{ fontSize: 13 }}>{user.user_metadata?.full_name?.split(' ')[0] || 'You'}</span>
               </div>
             ) : (
