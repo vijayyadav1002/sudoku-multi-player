@@ -1,4 +1,4 @@
-export default function NumberPad({ onNumber, onClear, disabled, notesMode, onToggleNotes }) {
+export default function NumberPad({ onNumber, onClear, onUndo, disabled, undoDisabled, notesMode, onToggleNotes }) {
   return (
     <div className="numpad">
       {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
@@ -19,6 +19,16 @@ export default function NumberPad({ onNumber, onClear, disabled, notesMode, onTo
           disabled={disabled}
         >
           ✎
+        </button>
+      )}
+      {onUndo && (
+        <button
+          className="num-action"
+          onClick={onUndo}
+          disabled={undoDisabled}
+          title="Undo"
+        >
+          ↶
         </button>
       )}
       <button
