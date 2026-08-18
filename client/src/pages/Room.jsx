@@ -1,6 +1,22 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
+import { avatarGradient, getPlayerPaletteId, initials } from '../lib/players';
+
+const MAX_PLAYERS = 10;
+
+function Logo() {
+  return (
+    <div className="logo">
+      <div className="logo-mark">
+        <span className="on" /><span /><span className="on" />
+        <span /><span className="on" /><span />
+        <span className="on" /><span /><span className="on" />
+      </div>
+      <span>Sudoku Battle</span>
+    </div>
+  );
+}
 
 export default function Room() {
   const { roomId } = useParams();
@@ -9,101 +25,154 @@ export default function Room() {
   const socket = useSocket();
   const state = location.state;
 
+  const [players, setPlayers] = useState(state?.players ?? []);
+  const [canStart, setCanStart] = useState((state?.players?.length ?? 0) >= 2);
+  const [starting, setStarting] = useState(false);
+  const [error, setError] = useState('');
   const [codeCopied, setCodeCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [difficulty, setDifficulty] = useState(state?.difficulty || 'medium');
 
   useEffect(() => {
-    if (!state?.puzzle) {
-      navigate('/');
-      return;
-    }
+    if (!state?.nickname) { navigate('/'); return; }
 
-    function handleOpponentJoined(data) {
-      navigate(`/game/${roomId}`, {
-        state: {
-          puzzle: data.puzzle ?? state.puzzle,
-          solution: data.solution ?? state.solution,
-          difficulty: data.difficulty ?? state.difficulty,
-          nickname: state.nickname,
-          opponentNickname: data.opponentNickname,
-        },
-      });
+    function handlePlayerJoined({ players: updated, canStart: cs }) {
+      setPlayers(updated); setCanStart(cs);
     }
+    function handlePlayerLeft({ remainingPlayers, canStart: cs }) {
+      setPlayers(remainingPlayers);
+      setCanStart(cs ?? remainingPlayers.length >= 2);
+    }
+    function handleGameStarted(data) {
+      navigate(`/game/${roomId}`, { state: { puzzle: data.puzzle, solution: data.solution, difficulty: data.difficulty, nickname: state.nickname, players: data.players, isHost: state.isHost, mySocketId: socket.id, avatarId: state.avatarId } });
+    }
+    function handleRoomClosed() { navigate('/'); }
 
-    socket.on('opponent-joined', handleOpponentJoined);
-    return () => socket.off('opponent-joined', handleOpponentJoined);
+    socket.on('player-joined', handlePlayerJoined);
+    socket.on('player-left', handlePlayerLeft);
+    socket.on('game-started', handleGameStarted);
+    socket.on('room-closed', handleRoomClosed);
+    return () => {
+      socket.off('player-joined', handlePlayerJoined);
+      socket.off('player-left', handlePlayerLeft);
+      socket.off('game-started', handleGameStarted);
+      socket.off('room-closed', handleRoomClosed);
+    };
   }, [socket, roomId, navigate, state]);
 
+  function handleStart() {
+    setStarting(true); setError('');
+    socket.emit('start-game', { roomId }, (res) => {
+      if (!res.ok) { setStarting(false); setError(res.error || 'Failed to start game'); }
+    });
+  }
+
   function copyCode() {
-    navigator.clipboard.writeText(roomId).then(() => {
-      setCodeCopied(true);
-      setTimeout(() => setCodeCopied(false), 2000);
-    });
+    navigator.clipboard.writeText(roomId).then(() => { setCodeCopied(true); setTimeout(() => setCodeCopied(false), 2000); });
   }
-
   function copyLink() {
-    const url = `${window.location.origin}/?join=${roomId}`;
-    navigator.clipboard.writeText(url).then(() => {
-      setLinkCopied(true);
-      setTimeout(() => setLinkCopied(false), 2000);
-    });
+    navigator.clipboard.writeText(`${window.location.origin}/?join=${roomId}`).then(() => { setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); });
   }
+  function leave() { socket.emit('leave-game', { roomId }); navigate('/'); }
 
-  if (!state?.puzzle) return null;
+  if (!state?.nickname) return null;
 
   return (
-    <div className="min-h-full bg-slate-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm text-center">
-        <div className="bg-slate-800 rounded-2xl p-8 shadow-xl space-y-6">
-          {/* Waiting indicator */}
+    <div className="screen">
+      <div className="bg-orbs"><div className="orb a" /><div className="orb b" /><div className="orb c" /></div>
+      <div className="bg-grid" />
+
+      <div className="topbar">
+        <Logo />
+        <div className="topbar-actions">
+          <button className="btn-ghost" style={{ padding: '8px 14px' }} onClick={leave}>← Leave room</button>
+        </div>
+      </div>
+
+      <div className="lobby">
+        <div className="lobby-head">
           <div>
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-pulse" />
-              <span className="text-slate-300 text-sm font-medium">Waiting for opponent…</span>
+            <h1>Waiting room <span className="vis-chip vis-chip-private" style={{ marginLeft: 14, verticalAlign: 'middle', fontSize: 12 }}>🔒 Private</span></h1>
+            <div className="sub">Share the code below — only people with the invite can join.</div>
+          </div>
+          <div className="room-code-pill">
+            <div>
+              <div className="label">Room code</div>
+              <div className="code">{roomId}</div>
             </div>
-            <p className="text-slate-500 text-xs">Share the code below with your friend</p>
+            <button className="icon-btn" title="Copy code" onClick={copyCode}>{codeCopied ? '✓' : '⧉'}</button>
+            <button className="icon-btn" title="Copy link" onClick={copyLink}>{linkCopied ? '✓' : '↗'}</button>
+          </div>
+        </div>
+
+        <div className="lobby-grid">
+          {/* Players card */}
+          <div className="players-card card">
+            <div className="players-head">
+              <h3>Players</h3>
+              <span className="players-count">{players.length} / {MAX_PLAYERS}</span>
+            </div>
+            <div className="players-list">
+              {players.map((p, i) => {
+                const pid = getPlayerPaletteId(i);
+                const isMe = p.socketId === socket.id;
+                return (
+                  <div className="player-slot" key={p.socketId} style={{ '--accent-c': `var(--p${(i % 6) + 1})` }}>
+                    <div className="avatar" style={{ background: isMe && state.avatarId ? avatarGradient(state.avatarId) : avatarGradient(pid) }}>
+                      {initials(p.nickname)}
+                    </div>
+                    <div className="p-info">
+                      <div className="p-name">
+                        {p.nickname}
+                        {isMe && <span className="p-tag">You</span>}
+                        {p.isHost && <span className="p-tag" style={{ background: 'oklch(0.82 0.16 80 / 0.2)', color: 'oklch(0.82 0.16 80)' }}>Host</span>}
+                      </div>
+                      <div className="p-meta">Joined</div>
+                    </div>
+                  </div>
+                );
+              })}
+              {Array.from({ length: MAX_PLAYERS - players.length }).map((_, i) => (
+                <div key={`empty-${i}`} className="player-slot empty">+ Open slot</div>
+              ))}
+            </div>
           </div>
 
-          {/* Room code display */}
-          <div className="bg-slate-900 rounded-2xl py-6 px-4">
-            <p className="text-slate-500 text-xs uppercase tracking-widest mb-2">Room Code</p>
-            <p className="text-5xl font-bold font-mono tracking-[0.2em] text-indigo-400 select-all">
-              {roomId}
-            </p>
-          </div>
+          {/* Settings card */}
+          <div className="settings-card card">
+            {state.isHost && (
+              <div>
+                <h3 style={{ marginBottom: 12 }}>Difficulty</h3>
+                <div className="diff-row">
+                  {[{ id: 'easy', sub: '~3 min' }, { id: 'medium', sub: '~5 min' }, { id: 'hard', sub: '~9 min' }].map(d => (
+                    <div key={d.id} className={`diff-opt${difficulty === d.id ? ' active' : ''}`} onClick={() => setDifficulty(d.id)}>
+                      {d.id.charAt(0).toUpperCase() + d.id.slice(1)}<small>{d.sub}</small>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
-          {/* Copy buttons */}
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={copyCode}
-              className="py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl text-sm font-medium transition-colors"
-            >
-              {codeCopied ? '✓ Copied' : 'Copy Code'}
-            </button>
-            <button
-              onClick={copyLink}
-              className="py-2.5 bg-indigo-700 hover:bg-indigo-600 text-white rounded-xl text-sm font-medium transition-colors"
-            >
-              {linkCopied ? '✓ Copied' : 'Copy Link'}
-            </button>
-          </div>
+            {error && <p style={{ color: 'oklch(0.7 0.22 25)', fontSize: 13 }}>{error}</p>}
 
-          {/* Game info */}
-          <div className="flex items-center justify-center gap-3 text-xs text-slate-500">
-            <span>Playing as <span className="text-slate-300">{state.nickname}</span></span>
-            <span>·</span>
-            <span className="capitalize">{state.difficulty}</span>
+            <div className="start-row">
+              <button className="btn btn-secondary" onClick={leave}>Leave</button>
+              {state.isHost ? (
+                <button
+                  className="btn btn-primary"
+                  onClick={handleStart}
+                  disabled={!canStart || starting}
+                  style={!canStart || starting ? { opacity: 0.5 } : undefined}
+                >
+                  {starting ? 'Starting…' : canStart ? `Start · ${players.length} player${players.length === 1 ? '' : 's'}` : 'Waiting for players…'}
+                </button>
+              ) : (
+                <div className="pill">
+                  <span className="dot-live" /> Waiting for host to start…
+                </div>
+              )}
+            </div>
           </div>
-
-          <button
-            onClick={() => {
-              socket.emit('leave-game', { roomId });
-              navigate('/');
-            }}
-            className="text-slate-600 hover:text-slate-400 text-sm transition-colors"
-          >
-            Cancel
-          </button>
         </div>
       </div>
     </div>

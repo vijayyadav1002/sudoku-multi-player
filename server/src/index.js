@@ -3,6 +3,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import roomsRouter from './routes/rooms.js';
+import gamesRouter from './routes/games.js';
 import { registerGameHandlers } from './socket/gameHandlers.js';
 
 const app = express();
@@ -17,6 +18,7 @@ const io = new Server(httpServer, {
 app.use(cors({ origin: CLIENT_URL }));
 app.use(express.json());
 app.use('/api/rooms', roomsRouter);
+app.use('/api/games', gamesRouter);
 
 io.on('connection', (socket) => {
   registerGameHandlers(io, socket);

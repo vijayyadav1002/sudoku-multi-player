@@ -1,6 +1,7 @@
 export const rooms = new Map();
+export const MAX_PLAYERS = 10;
 
-export function createRoom(id, difficulty, puzzle, solution) {
+export function createRoom(id, difficulty, puzzle, solution, hostSocketId) {
   const room = {
     id,
     difficulty,
@@ -11,6 +12,7 @@ export function createRoom(id, difficulty, puzzle, solution) {
     winner: null,
     startedAt: null,
     createdAt: new Date(),
+    hostSocketId,
   };
   rooms.set(id, room);
   return room;
@@ -27,6 +29,7 @@ export function deleteRoom(id) {
 export function addPlayer(roomId, socketId, nickname) {
   const room = rooms.get(roomId);
   if (!room) return null;
+  if (room.players.length >= MAX_PLAYERS) return null;
   const player = {
     socketId,
     nickname,
@@ -39,10 +42,60 @@ export function addPlayer(roomId, socketId, nickname) {
   return player;
 }
 
-export function getOpponent(roomId, socketId) {
+export function removePlayer(roomId, socketId) {
   const room = rooms.get(roomId);
   if (!room) return null;
-  return room.players.find(p => p.socketId !== socketId) ?? null;
+  const idx = room.players.findIndex(p => p.socketId === socketId);
+  if (idx === -1) return null;
+  const [player] = room.players.splice(idx, 1);
+  return { room, player };
+}
+
+export function getPlayerSummaries(room) {
+  return room.players.map(p => ({
+    socketId: p.socketId,
+    nickname: p.nickname,
+    isHost: p.socketId === room.hostSocketId,
+  }));
+}
+
+export function getOtherPlayers(roomId, socketId) {
+  const room = rooms.get(roomId);
+  if (!room) return [];
+  return room.players.filter(p => p.socketId !== socketId);
+}
+
+export function isHost(roomId, socketId) {
+  const room = rooms.get(roomId);
+  return room?.hostSocketId === socketId;
+}
+
+export function startGame(roomId) {
+  const room = rooms.get(roomId);
+  if (!room) return null;
+  room.status = 'playing';
+  room.startedAt = new Date();
+  return room;
+}
+
+export function buildLeaderboard(room) {
+  const players = [...room.players];
+  players.sort((a, b) => {
+    if (a.completed && b.completed) return a.completedAt - b.completedAt;
+    if (a.completed) return -1;
+    if (b.completed) return 1;
+    return b.progress - a.progress;
+  });
+  return players.map((p, i) => ({
+    rank: i + 1,
+    socketId: p.socketId,
+    nickname: p.nickname,
+    progress: p.progress,
+    completedAt: p.completedAt ? p.completedAt.getTime() : null,
+    duration: p.completedAt && room.startedAt
+      ? Math.round((p.completedAt - room.startedAt) / 1000)
+      : null,
+  }));
 }
 
 export function updatePlayerCell(roomId, socketId, index, value) {

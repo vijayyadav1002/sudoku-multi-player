@@ -11,8 +11,9 @@ export default function Timer({ running }) {
   }, [running]);
 
   return (
-    <span className="font-mono text-slate-300 text-lg tabular-nums">
+    <div className="timer-pill">
+      <span className="dot" />
       {formatDuration(seconds)}
-    </span>
+    </div>
   );
 }

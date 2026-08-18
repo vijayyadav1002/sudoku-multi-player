@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getRoom } from '../game/roomManager.js';
+import { getRoom, MAX_PLAYERS } from '../game/roomManager.js';
 import { generatePuzzle } from '../game/sudokuGenerator.js';
 
 const router = Router();
@@ -22,7 +22,8 @@ router.get('/:id', (req, res) => {
     difficulty: room.difficulty,
     status: room.status,
     playerCount: room.players.length,
-    canJoin: room.status === 'waiting' && room.players.length < 2,
+    maxPlayers: MAX_PLAYERS,
+    canJoin: room.status === 'waiting' && room.players.length < MAX_PLAYERS,
   });
 });
 
