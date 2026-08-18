@@ -32,6 +32,7 @@ export default function Room() {
   const [codeCopied, setCodeCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [difficulty, setDifficulty] = useState(state?.difficulty || 'medium');
+  const isPublic = state?.isPublic ?? false;
 
   useEffect(() => {
     if (!state?.nickname) { navigate('/'); return; }
@@ -43,6 +44,13 @@ export default function Room() {
       setPlayers(remainingPlayers);
       setCanStart(cs ?? remainingPlayers.length >= 2);
     }
+    function handleRoomUpdated({ difficulty: updatedDifficulty, players: updatedPlayers }) {
+      if (updatedDifficulty) setDifficulty(updatedDifficulty);
+      if (updatedPlayers) {
+        setPlayers(updatedPlayers);
+        setCanStart(updatedPlayers.length >= 2);
+      }
+    }
     function handleGameStarted(data) {
       navigate(`/game/${roomId}`, { state: { puzzle: data.puzzle, solution: data.solution, difficulty: data.difficulty, nickname: state.nickname, players: data.players, isHost: state.isHost, mySocketId: socket.id, avatarId: state.avatarId } });
     }
@@ -50,15 +58,30 @@ export default function Room() {
 
     socket.on('player-joined', handlePlayerJoined);
     socket.on('player-left', handlePlayerLeft);
+    socket.on('room-updated', handleRoomUpdated);
     socket.on('game-started', handleGameStarted);
     socket.on('room-closed', handleRoomClosed);
     return () => {
       socket.off('player-joined', handlePlayerJoined);
       socket.off('player-left', handlePlayerLeft);
+      socket.off('room-updated', handleRoomUpdated);
       socket.off('game-started', handleGameStarted);
       socket.off('room-closed', handleRoomClosed);
     };
   }, [socket, roomId, navigate, state]);
+
+  function handleDifficultyChange(nextDifficulty) {
+    if (!state.isHost || nextDifficulty === difficulty || starting) return;
+    const previousDifficulty = difficulty;
+    setDifficulty(nextDifficulty);
+    setError('');
+    socket.emit('change-difficulty', { roomId, difficulty: nextDifficulty }, (res) => {
+      if (!res.ok) {
+        setDifficulty(previousDifficulty);
+        setError(res.error || 'Failed to update difficulty');
+      }
+    });
+  }
 
   function handleStart() {
     setStarting(true); setError('');
@@ -92,8 +115,8 @@ export default function Room() {
       <div className="lobby">
         <div className="lobby-head">
           <div>
-            <h1>Waiting room <span className="vis-chip vis-chip-private" style={{ marginLeft: 14, verticalAlign: 'middle', fontSize: 12 }}>🔒 Private</span></h1>
-            <div className="sub">Share the code below — only people with the invite can join.</div>
+            <h1>Waiting room <span className={`vis-chip ${isPublic ? 'vis-chip-public' : 'vis-chip-private'}`} style={{ marginLeft: 14, verticalAlign: 'middle', fontSize: 12 }}>{isPublic ? '🌐 Public' : '🔒 Private'}</span></h1>
+            <div className="sub">{isPublic ? 'This room is visible in the public lobby — anyone can join.' : 'Share the code below — only people with the invite can join.'}</div>
           </div>
           <div className="room-code-pill">
             <div>
@@ -145,7 +168,7 @@ export default function Room() {
                 <h3 style={{ marginBottom: 12 }}>Difficulty</h3>
                 <div className="diff-row">
                   {[{ id: 'easy', sub: '~3 min' }, { id: 'medium', sub: '~5 min' }, { id: 'hard', sub: '~9 min' }].map(d => (
-                    <div key={d.id} className={`diff-opt${difficulty === d.id ? ' active' : ''}`} onClick={() => setDifficulty(d.id)}>
+                    <div key={d.id} className={`diff-opt${difficulty === d.id ? ' active' : ''}`} onClick={() => handleDifficultyChange(d.id)}>
                       {d.id.charAt(0).toUpperCase() + d.id.slice(1)}<small>{d.sub}</small>
                     </div>
                   ))}

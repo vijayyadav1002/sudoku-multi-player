@@ -33,6 +33,7 @@ export default function Solo() {
   const [solution, setSolution] = useState(null);
   const [board, setBoard] = useState([]);
   const [selectedCell, setSelectedCell] = useState(null);
+  const [undoStack, setUndoStack] = useState([]);
   const [notesMode, setNotesMode] = useState(false);
   const [progress, setProgress] = useState(0);
   const [completed, setCompleted] = useState(false);
@@ -58,6 +59,7 @@ export default function Solo() {
   async function loadPuzzle(diff) {
     setLoading(true); setError(''); setCompleted(false);
     setProgress(0); setSelectedCell(null);
+    setUndoStack([]);
     elapsedRef.current = 0; setDisplayElapsed(0); setTimerRunning(false);
     try {
       const res = await fetch(`${API_URL}/api/rooms/puzzle?difficulty=${diff}`);
@@ -77,32 +79,57 @@ export default function Solo() {
   const handleCellChange = useCallback((index, value) => {
     if (completed || !puzzle) return;
     if (isCellGiven(puzzle, index)) return;
-    setBoard(prev => {
-      const next = [...prev];
-      next[index] = value;
-      const p = calcClientProgress(next, puzzle, solution);
-      setProgress(toMilestone(p));
-      if (p === 100) {
-        setTimerRunning(false);
-        const t = elapsedRef.current;
-        setFinalTime(t);
-        setCompleted(true);
-        const record = { difficulty, time: t, date: new Date().toISOString() };
-        const prev2 = JSON.parse(localStorage.getItem('sudoku-solo-history') || '[]');
-        const updated = [record, ...prev2].slice(0, 20);
-        localStorage.setItem('sudoku-solo-history', JSON.stringify(updated));
-        setHistory(updated);
-        if (session?.access_token) {
-          saveGame({
-            mode: 'solo', difficulty, playerCount: 1,
-            winnerNickname: nickname || 'Player', totalDuration: t,
-            players: [{ isMe: true, nickname: nickname || 'Player', outcome: 'completed', rank: 1, progress: 100, duration: t }],
-          }, session.access_token);
-        }
+    const previousValue = board[index];
+    if (previousValue === value) return;
+
+    const next = [...board];
+    next[index] = value;
+    setUndoStack(prev => [{ index, previousValue }, ...prev].slice(0, 100));
+    setBoard(next);
+
+    const p = calcClientProgress(next, puzzle, solution);
+    setProgress(toMilestone(p));
+    if (p === 100) {
+      setTimerRunning(false);
+      const t = elapsedRef.current;
+      setFinalTime(t);
+      setCompleted(true);
+      const record = { difficulty, time: t, date: new Date().toISOString() };
+      const prev2 = JSON.parse(localStorage.getItem('sudoku-solo-history') || '[]');
+      const updated = [record, ...prev2].slice(0, 20);
+      localStorage.setItem('sudoku-solo-history', JSON.stringify(updated));
+      setHistory(updated);
+      if (session?.access_token) {
+        saveGame({
+          mode: 'solo', difficulty, playerCount: 1,
+          winnerNickname: nickname || 'Player', totalDuration: t,
+          players: [{ isMe: true, nickname: nickname || 'Player', outcome: 'completed', rank: 1, progress: 100, duration: t }],
+        }, session.access_token);
       }
-      return next;
-    });
-  }, [puzzle, solution, completed, difficulty, nickname, session]);
+    }
+  }, [board, puzzle, solution, completed, difficulty, nickname, session]);
+
+  const handleUndo = useCallback(() => {
+    if (completed || undoStack.length === 0) return;
+    const [last, ...rest] = undoStack;
+    const next = [...board];
+    next[last.index] = last.previousValue;
+    setUndoStack(rest);
+    setBoard(next);
+    setSelectedCell(last.index);
+    setProgress(toMilestone(calcClientProgress(next, puzzle, solution)));
+  }, [board, completed, puzzle, solution, undoStack]);
+
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        handleUndo();
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleUndo]);
 
   function handleNumberPad(num) {
     if (selectedCell === null) return;
@@ -241,13 +268,15 @@ export default function Solo() {
         <NumberPad
           onNumber={handleNumberPad}
           onClear={handleClear}
+          onUndo={handleUndo}
           disabled={completed || selectedCell === null}
+          undoDisabled={completed || undoStack.length === 0}
           notesMode={notesMode}
           onToggleNotes={() => setNotesMode(n => !n)}
         />
 
         <p style={{ fontSize: 12, color: 'var(--text-faint)', fontFamily: 'JetBrains Mono, monospace' }}>
-          ← → ↑ ↓ navigate · 1–9 fill · Backspace erase
+          ← → ↑ ↓ navigate · 1–9 fill · Backspace erase · ⌘/Ctrl-Z undo
         </p>
       </div>
     </div>

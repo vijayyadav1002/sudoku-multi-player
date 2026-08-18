@@ -55,8 +55,8 @@ npm start        # Production start
 - **`components/`**: Shared UI — `SudokuBoard`, `SudokuCell`, `NumberPad`, `Timer`, `PlayerStatus`, `PlayerProgressStrip`, `ProgressBar`.
 
 **Pages and their roles:**
-- `Home` — entry point; nickname input, create/join room, solo play, leaderboard link
-- `Room` — waiting lobby; shows 6-char room code, host can start when ≥2 players join; listens for `game-started` / `room-closed`
+- `Home` — entry point; nickname input, avatar picker, create/join room (with Public/Private visibility toggle), solo play, leaderboard link, and live public room browser (joins `"lobby"` Socket.IO room on mount to receive real-time `public-rooms-updated` events; clicking a tile auto-joins)
+- `Room` — waiting lobby; shows 6-char room code, Public/Private chip (from `location.state.isPublic`), host can start when ≥2 players join; listens for `game-started` / `room-closed`
 - `Game` — live multiplayer game; emits `cell-update`, receives `players-progress` (milestone-snapped to 0/25/50/75/100), `player-left`, `game-over`, `emote`
 - `Result` — post-game podium with confetti for winner; saves game to localStorage + Supabase
 - `Solo` — single-player; fetches puzzle from `GET /api/rooms/puzzle`, progress bar, saves to localStorage + Supabase on completion
@@ -69,20 +69,22 @@ npm start        # Production start
 
 - **`index.js`**: Creates Express + Socket.IO server, mounts `/api/rooms` router, registers socket handlers.
 - **`routes/rooms.js`**: Two REST endpoints — `GET /api/rooms/puzzle` (generates a puzzle for solo mode) and `GET /api/rooms/:id` (returns room metadata for join validation).
-- **`socket/gameHandlers.js`**: All game socket events — `create-room`, `join-room`, `cell-update`, `leave-game`, `disconnect`.
-- **`game/roomManager.js`**: In-memory `Map` of rooms. Each room holds the puzzle/solution arrays (flat 81-element), player list with their own board copies, and progress. Rooms are deleted 30s after a game ends.
+- **`socket/gameHandlers.js`**: All game socket events — `create-room`, `join-room`, `cell-update`, `leave-game`, `disconnect`, plus `join-lobby`/`leave-lobby` for the public room browser. Calls `broadcastPublicRooms(io)` after every mutation that changes the public room list.
+- **`game/roomManager.js`**: In-memory `Map` of rooms. Each room holds puzzle/solution arrays (flat 81-element), player list with board copies and progress, and an `isPublic` boolean. `getPublicRooms()` returns serializable summaries of all public waiting rooms. Rooms are deleted 30s after a game ends.
 - **`game/sudokuGenerator.js`**: Generates a valid, uniquely-solvable puzzle. Removes cells based on difficulty (`easy`: 35 removed, `medium`: 45, `hard`: 52), verifying unique solution after each removal via backtracking.
 
 ### Socket Event Contract
 
 | Event (client→server) | Payload | Callback |
 |---|---|---|
-| `create-room` | `{ nickname, difficulty }` | `{ ok, roomId }` |
+| `create-room` | `{ nickname, difficulty, isPublic }` | `{ ok, roomId, isPublic }` |
 | `join-room` | `{ roomId, nickname }` | `{ ok, roomId, players }` |
 | `start-game` | `{ roomId }` | `{ ok }` (host only) |
 | `cell-update` | `{ roomId, index, value }` | — |
 | `leave-game` | `{ roomId }` | — |
 | `emote` | `{ roomId, emote }` | — |
+| `join-lobby` | — | — (server sends `public-rooms-updated` immediately) |
+| `leave-lobby` | — | — |
 
 | Event (server→client) | Payload |
 |---|---|
@@ -92,6 +94,7 @@ npm start        # Production start
 | `game-over` | `{ leaderboard, winnerSocketId, winnerNickname, difficulty, totalDuration }` |
 | `room-closed` | `{ reason }` |
 | `emote` | `{ socketId, emote }` |
+| `public-rooms-updated` | `{ rooms: [{ id, difficulty, playerCount, maxPlayers, hostNickname, createdAt }] }` — broadcast to "lobby" Socket.IO room |
 
 ### Board Representation
 

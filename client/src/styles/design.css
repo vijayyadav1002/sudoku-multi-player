@@ -1072,7 +1072,7 @@ input {
 /* Number pad */
 .numpad {
   display: grid;
-  grid-template-columns: repeat(11, 1fr);
+  grid-template-columns: repeat(12, 1fr);
   gap: 6px;
   width: 100%;
   max-width: 580px;
@@ -2448,4 +2448,85 @@ input {
 @media (max-width: 1100px) {
   .rooms-browser { padding: 0 28px 60px; }
   .rooms-head { flex-direction: column; align-items: flex-start; gap: 14px; }
+}
+
+/* ── Tablet (≤ 900px) — lobby collapse ───────────────────────────── */
+@media (max-width: 900px) {
+  .lobby { padding: 24px 28px 48px; }
+  .lobby-head h1 { font-size: 34px; }
+  .lobby-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Mobile (≤ 640px) ────────────────────────────────────────────── */
+@media (max-width: 640px) {
+
+  /* Topbar: hide logo text to reclaim horizontal space */
+  .topbar { padding: 12px 14px; gap: 8px; }
+  .topbar .logo > span:last-child { display: none; }
+  .topbar-actions { gap: 3px; }
+  .topbar-actions .pill { padding: 6px 8px; font-size: 11px; gap: 5px; }
+  .topbar-actions .btn-ghost { padding: 6px 8px; font-size: 12px; }
+
+  /* Home hero */
+  .home-main { padding: 16px 16px 28px; gap: 16px; }
+  .hero-title { font-size: 36px; }
+  .hero-sub { font-size: 15px; max-width: 100%; }
+  .hero-stats { gap: 16px; flex-wrap: wrap; }
+  .hero-stat .num { font-size: 20px; }
+  .hero-stat .lbl { font-size: 11px; }
+  .cta-card { padding: 20px 14px; }
+
+  /* Rooms browser */
+  .rooms-browser { padding: 0 16px 36px; }
+  .rooms-grid { grid-template-columns: 1fr; }
+
+  /* Lobby */
+  .lobby { padding: 14px 16px 36px; }
+  .lobby-head { flex-direction: column; align-items: flex-start; gap: 14px; margin-bottom: 18px; }
+  .lobby-head h1 { font-size: 26px; }
+  .lobby-grid { grid-template-columns: 1fr; }
+  .players-list { grid-template-columns: 1fr; }
+  .room-code-pill { padding: 10px 12px 10px 14px; }
+  .room-code-pill .code { font-size: 18px; letter-spacing: 0.1em; }
+
+  /* Game screen */
+  .game { padding: 10px 12px 20px; gap: 10px; }
+  .game-topbar { padding: 2px 0 6px; }
+  .game-topbar .left { gap: 8px; }
+  .game .logo > span:last-child { display: none; }
+  .logo-mark { width: 30px; height: 30px; border-radius: 9px; }
+  .game-topbar .room-tag { display: none; }
+
+  /* Player rail → horizontal scrollable strip */
+  .rail {
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 8px;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .rail::-webkit-scrollbar { display: none; }
+  .rail-head { display: none; }
+  .opponent { flex-shrink: 0; width: 148px; padding: 10px; }
+  .opp-stats { font-size: 10px; }
+
+  /* Hide activity feed — too much on small screen */
+  .activity { display: none; }
+
+  /* Numpad: taller tap targets on touch */
+  .numpad { gap: 4px; }
+  .num { aspect-ratio: unset; min-height: 44px; font-size: clamp(14px, 4vw, 20px); }
+  .num-action { aspect-ratio: unset; min-height: 44px; font-size: clamp(12px, 3.5vw, 16px); }
+
+  /* Leaderboard */
+  .lb-wrap { padding: 14px 16px 36px; }
+  .lb-cta { flex-direction: column; gap: 12px; }
+
+  /* Result/victory modal */
+  .victory-card { padding: 22px 16px; width: 95%; max-width: 95vw; }
+  .victory-card h2 { font-size: 24px; margin: 8px 0 4px; }
+  .podium-spot.first { height: 140px; }
+  .podium-spot.second { height: 116px; }
+  .podium-spot.third { height: 96px; }
 }

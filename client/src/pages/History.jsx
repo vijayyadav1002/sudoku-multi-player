@@ -36,18 +36,18 @@ export default function History() {
     setDbLoading(true);
     supabase
       .from('game_players')
-      .select(`outcome, rank, progress, duration_seconds, games(mode, difficulty, winner_nickname, player_count, total_duration_seconds, played_at)`)
+      .select(`outcome, rank, progress, duration_seconds, games(mode, difficulty, winner_nickname, player_count, total_duration_seconds, created_at)`)
       .order('created_at', { ascending: false })
       .limit(50)
       .then(({ data }) => {
         if (!data) return;
         const solo = data.filter(r => r.games?.mode === 'solo').map(r => ({
-          difficulty: r.games.difficulty, time: r.duration_seconds, date: r.games.played_at,
+          difficulty: r.games.difficulty, time: r.duration_seconds, date: r.games.created_at,
         }));
         const battles = data.filter(r => r.games?.mode === 'battle').map(r => ({
           outcome: r.outcome, winnerNickname: r.games.winner_nickname ?? '',
           difficulty: r.games.difficulty, duration: r.games.total_duration_seconds,
-          playerCount: r.games.player_count, myRank: r.rank, myProgress: r.progress, date: r.games.played_at,
+          playerCount: r.games.player_count, myRank: r.rank, myProgress: r.progress, date: r.games.created_at,
         }));
         if (solo.length > 0) setSoloHistory(solo);
         if (battles.length > 0) setBattleHistory(battles);

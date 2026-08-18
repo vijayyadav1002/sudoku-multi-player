@@ -35,6 +35,7 @@ export default function Game() {
     state?.puzzle ? [...state.puzzle] : []
   );
   const [selectedCell, setSelectedCell] = useState(null);
+  const [undoStack, setUndoStack] = useState([]);
   const [notesMode, setNotesMode] = useState(false);
   const [activePlayers, setActivePlayers] = useState(state?.players ?? []);
   const [playersProgress, setPlayersProgress] = useState(() => {
@@ -109,15 +110,41 @@ export default function Game() {
   const handleCellChange = useCallback((index, value) => {
     if (gameOver || !state?.puzzle) return;
     if (isCellGiven(state.puzzle, index)) return;
-    setBoard(prev => {
-      const next = [...prev];
-      next[index] = value;
-      const progress = toMilestone(calcClientProgress(next, state.puzzle, state.solution));
-      setPlayersProgress(pm => new Map(pm).set(mySocketId, progress));
-      socket.emit('cell-update', { roomId, index, value });
-      return next;
-    });
-  }, [socket, roomId, state, gameOver, mySocketId]);
+    const previousValue = board[index];
+    if (previousValue === value) return;
+
+    const next = [...board];
+    next[index] = value;
+    const progress = toMilestone(calcClientProgress(next, state.puzzle, state.solution));
+    setUndoStack(prev => [{ index, previousValue }, ...prev].slice(0, 100));
+    setBoard(next);
+    setPlayersProgress(pm => new Map(pm).set(mySocketId, progress));
+    socket.emit('cell-update', { roomId, index, value });
+  }, [board, socket, roomId, state, gameOver, mySocketId]);
+
+  const handleUndo = useCallback(() => {
+    if (gameOver || !state?.puzzle || undoStack.length === 0) return;
+    const [last, ...rest] = undoStack;
+    const next = [...board];
+    next[last.index] = last.previousValue;
+    const progress = toMilestone(calcClientProgress(next, state.puzzle, state.solution));
+    setUndoStack(rest);
+    setBoard(next);
+    setSelectedCell(last.index);
+    setPlayersProgress(pm => new Map(pm).set(mySocketId, progress));
+    socket.emit('cell-update', { roomId, index: last.index, value: last.previousValue });
+  }, [board, gameOver, mySocketId, roomId, socket, state, undoStack]);
+
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        handleUndo();
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleUndo]);
 
   function handleNumberPad(num) {
     if (selectedCell === null) return;
@@ -236,12 +263,14 @@ export default function Game() {
           <NumberPad
             onNumber={handleNumberPad}
             onClear={handleClear}
+            onUndo={handleUndo}
             disabled={gameOver || selectedCell === null}
+            undoDisabled={gameOver || undoStack.length === 0}
             notesMode={notesMode}
             onToggleNotes={() => setNotesMode(n => !n)}
           />
           <p style={{ fontSize: 12, color: 'var(--text-faint)', fontFamily: 'JetBrains Mono, monospace', textAlign: 'center' }}>
-            ← → ↑ ↓ navigate · 1–9 fill · Backspace erase
+            ← → ↑ ↓ navigate · 1–9 fill · Backspace erase · ⌘/Ctrl-Z undo
           </p>
         </div>
 

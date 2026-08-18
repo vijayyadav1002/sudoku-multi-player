@@ -1,7 +1,7 @@
 export const rooms = new Map();
 export const MAX_PLAYERS = 10;
 
-export function createRoom(id, difficulty, puzzle, solution, hostSocketId) {
+export function createRoom(id, difficulty, puzzle, solution, hostSocketId, isPublic = false) {
   const room = {
     id,
     difficulty,
@@ -13,9 +13,27 @@ export function createRoom(id, difficulty, puzzle, solution, hostSocketId) {
     startedAt: null,
     createdAt: new Date(),
     hostSocketId,
+    isPublic: isPublic ?? false,
   };
   rooms.set(id, room);
   return room;
+}
+
+export function getPublicRooms() {
+  const result = [];
+  for (const room of rooms.values()) {
+    if (room.isPublic && room.status === 'waiting' && room.players.length < MAX_PLAYERS) {
+      result.push({
+        id: room.id,
+        difficulty: room.difficulty,
+        playerCount: room.players.length,
+        maxPlayers: MAX_PLAYERS,
+        hostNickname: room.players.find(p => p.socketId === room.hostSocketId)?.nickname ?? 'Unknown',
+        createdAt: room.createdAt.getTime(),
+      });
+    }
+  }
+  return result;
 }
 
 export function getRoom(id) {
@@ -30,6 +48,8 @@ export function addPlayer(roomId, socketId, nickname) {
   const room = rooms.get(roomId);
   if (!room) return null;
   if (room.players.length >= MAX_PLAYERS) return null;
+  const existing = room.players.find(p => p.socketId === socketId);
+  if (existing) return existing;
   const player = {
     socketId,
     nickname,
@@ -40,6 +60,21 @@ export function addPlayer(roomId, socketId, nickname) {
   };
   room.players.push(player);
   return player;
+}
+
+export function updateRoomDifficulty(roomId, difficulty, puzzle, solution) {
+  const room = rooms.get(roomId);
+  if (!room || room.status !== 'waiting') return null;
+  room.difficulty = difficulty;
+  room.puzzle = [...puzzle];
+  room.solution = [...solution];
+  room.players.forEach((player) => {
+    player.board = [...puzzle];
+    player.progress = 0;
+    player.completed = false;
+    player.completedAt = null;
+  });
+  return room;
 }
 
 export function removePlayer(roomId, socketId) {
