@@ -1,0 +1,36 @@
+name: Deploy Server (Railway)
+
+on:
+  push:
+    branches:
+      - master
+      - 'release/**'
+    paths:
+      - 'server/**'
+      - '.github/workflows/deploy-server.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-server-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy to Railway
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Railway
+        working-directory: server
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway up \
+            --service "${{ secrets.RAILWAY_SERVICE_NAME }}" \
+            --detach \
+            -m "Deploy ${{ github.sha }} (${{ github.ref_name }})"

@@ -123,6 +123,26 @@ Once both are deployed, update Railway's `CLIENT_URL` to your Vercel URL so CORS
 
 ---
 
+## CI/CD — GitHub Actions
+
+Merges to `master` or any `release/**` branch trigger automatic deploys via `.github/workflows/deploy-server.yml` and `.github/workflows/deploy-client.yml`. Each workflow is path-filtered — a push only redeploys the service whose folder changed (`server/**` or `client/**`).
+
+**Required GitHub repo secrets** (Settings → Secrets and variables → Actions):
+
+| Secret | Where to get it |
+|---|---|
+| `RAILWAY_TOKEN` | Railway dashboard → your server project → Settings → Tokens → create a **Project Token** scoped to the project + `production` environment |
+| `RAILWAY_SERVICE_NAME` | The service name in that Railway project (visible in the dashboard, or `railway service list --json` locally) |
+| `VERCEL_TOKEN` | [vercel.com/account/tokens](https://vercel.com/account/tokens) → create a token |
+| `VERCEL_ORG_ID` | `team_2LVoUyJAaTfnTRBxTHGS69Sh` (from `client/.vercel/project.json`) |
+| `VERCEL_PROJECT_ID` | `prj_Vh3uFM9IiLToQeTZplITPKWgAsTV` (from `client/.vercel/project.json`) |
+
+> **Avoid double deploys:** if the Railway service or Vercel project also has its native GitHub integration connected (auto-deploy on push configured in their dashboards), disconnect it or disable auto-deploy there — otherwise every push triggers both the platform's own build *and* this workflow.
+
+Manual/local deploys still work as a fallback (below) — the workflow just runs the same commands in CI.
+
+---
+
 ## Redeployment
 
 | What changed | Command |
