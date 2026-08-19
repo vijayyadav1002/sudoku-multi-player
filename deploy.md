@@ -139,6 +139,8 @@ Merges to `master` or any `release/**` branch trigger automatic deploys via `.gi
 
 > **Avoid double deploys:** if the Railway service or Vercel project also has its native GitHub integration connected (auto-deploy on push configured in their dashboards), disconnect it or disable auto-deploy there — otherwise every push triggers both the platform's own build *and* this workflow.
 
+> **If `vercel whoami --token=...` errors with "User not found"** for a token created at vercel.com/account/tokens, the dashboard-issued token is bad (seen on this project — root cause unconfirmed on Vercel's end). Workaround: run `vercel login` locally, then pull the token it stores at `~/Library/Application Support/com.vercel.cli/auth.json` (macOS) and use that as `VERCEL_TOKEN` instead.
+
 Manual/local deploys still work as a fallback (below) — the workflow just runs the same commands in CI.
 
 ---
